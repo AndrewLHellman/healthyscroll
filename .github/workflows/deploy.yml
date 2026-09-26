@@ -1,0 +1,84 @@
+# Build the landing page image, push it to GHCR, then pull + restart it on
+# the server. Needs one repo secret: DEPLOY_SSH_KEY (private key whose public
+# half is in root's authorized_keys on the server).
+name: Deploy web
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/web/**"
+      - "packages/shared/**"
+      - "deploy/**"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "package.json"
+      - ".dockerignore"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-web
+  cancel-in-progress: true
+
+env:
+  IMAGE: ghcr.io/andrewlhellman/healthyscroll-web
+  DEPLOY_HOST: 178.104.184.37
+  DEPLOY_USER: root
+  DEPLOY_DIR: /srv/healthyscroll
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy
+          chmod 600 ~/.ssh/deploy
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+      - name: Pull and restart on the server
+        run: |
+          SSH="ssh -i ~/.ssh/deploy $DEPLOY_USER@$DEPLOY_HOST"
+          $SSH "mkdir -p $DEPLOY_DIR && touch $DEPLOY_DIR/.env"
+          scp -i ~/.ssh/deploy deploy/docker-compose.yml "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_DIR/docker-compose.yml"
+          # The job token can read this repo's packages; log the server in with it, pull, restart.
+          echo "${{ secrets.GITHUB_TOKEN }}" | $SSH "docker login ghcr.io -u ${{ github.actor }} --password-stdin \
+            && cd $DEPLOY_DIR \
+            && docker compose pull --quiet \
+            && docker compose up -d --remove-orphans \
+            && docker image prune -f \
+            && docker logout ghcr.io"
+      - name: Check it's up
+        run: |
+          ssh -i ~/.ssh/deploy $DEPLOY_USER@$DEPLOY_HOST \
+            'for i in $(seq 1 20); do curl -fs -o /dev/null http://127.0.0.1:3001/ && echo up && exit 0; sleep 1; done; docker compose -f /srv/healthyscroll/docker-compose.yml logs --tail 50; exit 1'

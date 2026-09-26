@@ -1,0 +1,11 @@
+# Runs on the server at /srv/healthyscroll. The GitHub Actions deploy job
+# copies this file over, pulls the image it names, and restarts.
+# Secrets (AI_GATEWAY_API_KEY, ...) live in /srv/healthyscroll/.env on the
+# server, never in this file.
+services:
+  web:
+    image: ghcr.io/andrewlhellman/healthyscroll-web:latest
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "127.0.0.1:3001:3000"

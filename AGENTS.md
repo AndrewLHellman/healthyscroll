@@ -33,6 +33,10 @@ Node >= 22.12 (`.nvmrc`). If corepack complains about a keyid, prefix with `CORE
 - Anything shared between extension and web (types, Jev schema, thresholds) goes in `packages/shared`.
 - UI is minimal by design. Don't add settings, stats, or onboarding without being asked.
 
+## Deploy
+
+Pushing to `main` builds `apps/web/Dockerfile`, pushes it to `ghcr.io/andrewlhellman/healthyscroll-web`, and restarts it on the server via `deploy/docker-compose.yml` (`.github/workflows/deploy.yml`). On the server: `/srv/healthyscroll/{docker-compose.yml,.env}`, container on `127.0.0.1:3001`, nginx site `healthyscroll.net` in front. Secrets go in the server's `.env`, never in the repo.
+
 ## Current state
 
 TikTok adapter (scrape + skip) verified on the live For You page; the Jev/Moondream pipeline has not been run yet. The content script observer is gated behind `VITE_HS_ENABLE_CONTENT=true`; `VITE_HS_DEBUG=true` adds console logging and the `hs:probe` / `hs:skip` console hooks. Do not drive a browser or load the extension unless asked — see `docs/ROADMAP.md` Phase 1 for the order of operations.
