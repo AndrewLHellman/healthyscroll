@@ -6,7 +6,6 @@ import { PromptPlayground } from "@/components/PromptPlayground";
 import { WeekMock } from "@/components/WeekMock";
 import { PopupMock } from "@/components/PopupMock";
 import { PixelHeart } from "@/components/Mark";
-import { Dashboard } from "./Dashboard";
 
 export default function Home() {
   return (
@@ -192,7 +191,6 @@ function FinalCta() {
           >
             Get it for iPhone
           </a>
-          <Dashboard />
         </div>
         <div className="justify-self-start lg:justify-self-end">
           <PopupMock />

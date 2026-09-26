@@ -12,19 +12,20 @@ const COLUMNS = [
   {
     title: 'Product',
     links: [
-      { label: 'Getting started', href: '#getting-started' },
-      { label: 'Prompt playground', href: '#prompts' },
-      { label: 'Your week', href: '#insights' },
-      { label: 'Privacy', href: '#faq' },
-      { label: 'FAQ', href: '#faq' },
+      { label: 'Getting started', href: '/#getting-started' },
+      { label: 'Dashboard', href: '/dashboard' },
+      { label: 'Prompt playground', href: '/#prompts' },
+      { label: 'Your week', href: '/#insights' },
+      { label: 'Privacy', href: '/#faq' },
+      { label: 'FAQ', href: '/#faq' },
     ],
   },
   {
     title: 'Runs on',
     links: [
-      { label: 'Instagram Reels (Safari)', href: '#faq' },
-      { label: 'TikTok (Chrome)', href: '#faq' },
-      { label: 'YouTube Shorts (soon)', href: '#faq' },
+      { label: 'Instagram Reels (Safari)', href: '/#faq' },
+      { label: 'TikTok (Chrome)', href: '/#faq' },
+      { label: 'YouTube Shorts (soon)', href: '/#faq' },
     ],
   },
   {

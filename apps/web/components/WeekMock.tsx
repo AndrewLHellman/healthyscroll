@@ -1,5 +1,6 @@
 import { CATEGORY_LABELS, formatDuration, type Category, type Summary } from "@healthyscroll/shared";
 import { buildMockWeek } from "@/lib/mockWeek";
+import { categoryColor, REST_COLOR } from "@/lib/categoryColors";
 
 /**
  * A static rendering of the extension's "Your week" page, fed by a seeded
@@ -13,8 +14,6 @@ import { buildMockWeek } from "@/lib/mockWeek";
 
 /** Categories beyond the top N collapse into one grey band so the stack stays legible. */
 const TOP_N = 5;
-const RAMP = ["#12141a", "#3d434e", "#6c727f", "#9aa0ab", "#c4c8cf"];
-const REST = "#e6e8ec";
 const WEEKDAY = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
 export function WeekMock() {
@@ -67,10 +66,7 @@ function Panel({ title, hint, children }: { title: string; hint?: string; childr
 
 function Days({ week }: { week: Summary }) {
   const top = week.byCategory.slice(0, TOP_N).map((c) => c.category);
-  const color = (cat: Category) => {
-    const i = top.indexOf(cat);
-    return i >= 0 ? RAMP[i] : REST;
-  };
+  const color = (cat: Category) => (top.includes(cat) ? categoryColor(cat) : REST_COLOR);
   const max = Math.max(...week.days.map((d) => d.totalMs), 1);
 
   return (
@@ -99,15 +95,15 @@ function Days({ week }: { week: Summary }) {
         })}
       </div>
       <ul className="flex flex-wrap gap-x-4 gap-y-1.5 font-mono text-[11px] text-muted">
-        {week.byCategory.slice(0, TOP_N).map((c, i) => (
+        {week.byCategory.slice(0, TOP_N).map((c) => (
           <li key={c.category} className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-sm" style={{ background: RAMP[i] }} aria-hidden />
+            <span className="h-2 w-2 rounded-sm" style={{ background: categoryColor(c.category) }} aria-hidden />
             {CATEGORY_LABELS[c.category]} <span className="text-faint">{formatDuration(c.ms)}</span>
           </li>
         ))}
         {week.byCategory.length > TOP_N && (
           <li className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-sm" style={{ background: REST }} aria-hidden />
+            <span className="h-2 w-2 rounded-sm" style={{ background: REST_COLOR }} aria-hidden />
             everything else
           </li>
         )}
