@@ -4,23 +4,17 @@ import type {
   VisionMediaResponse,
 } from "@healthyscroll/shared";
 import { VISION_BASE_URL } from "../lib/config";
-import { getAccessToken } from "./auth";
+import { authedFetch } from "./auth";
 
 /**
  * apps/vision client. Same auth as /api/evaluate: the user's Supabase token.
  * Contract and client flow: packages/shared/src/vision.ts.
  */
 
-async function authHeaders(): Promise<Record<string, string>> {
-  const token = await getAccessToken();
-  if (!token) throw new Error("vision skipped: not signed in");
-  return { authorization: `Bearer ${token}` };
-}
-
 export async function analyze(req: VisionAnalyzeRequest): Promise<VisionAnalyzeResponse> {
-  const res = await fetch(`${VISION_BASE_URL}/analyze`, {
+  const res = await authedFetch(`${VISION_BASE_URL}/analyze`, {
     method: "POST",
-    headers: { "content-type": "application/json", ...(await authHeaders()) },
+    headers: { "content-type": "application/json" },
     body: JSON.stringify(req),
   });
   if (!res.ok) throw new Error(`vision analyze failed: ${res.status} ${await res.text()}`);
@@ -39,9 +33,7 @@ export async function waitForCaption(
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     try {
-      const res = await fetch(`${VISION_BASE_URL}/media/${platform}/${encodeURIComponent(videoId)}`, {
-        headers: await authHeaders(),
-      });
+      const res = await authedFetch(`${VISION_BASE_URL}/media/${platform}/${encodeURIComponent(videoId)}`);
       if (!res.ok) return null;
       const media = (await res.json()) as VisionMediaResponse;
       if (media.captionStatus === "ready") return media.caption ?? null;
