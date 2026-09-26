@@ -19,13 +19,13 @@ const mono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Healthy Scroll: your prompt, your feed",
+  title: "Healthy Scroll: Take back your feed",
   description:
-    "A Safari extension for iPhone that skips the Instagram Reels you asked not to see, before they get a chance to hook you. Decisions in about 200 ms. Frames are described, then discarded.",
+    "Set your own limits on your Instagram feed. Tell Healthy Scroll what you’d like to avoid, and it skips matching Reels in Safari on your iPhone.",
   metadataBase: new URL("https://healthyscroll.net"),
   openGraph: {
     title: "Healthy Scroll",
-    description: "Skip the Reels you never wanted to see. Before they hook you.",
+    description: "Take back your feed.",
     type: "website",
   },
 };

@@ -39,7 +39,7 @@ export function WeekMock() {
         <Panel title="Where the time went">
           <Days week={week} />
         </Panel>
-        <Panel title="What holds you" hint="how long you stay, relative to your average">
+        <Panel title="What you watch longest" hint="watch time per video vs. your average">
           <Holds week={week} />
         </Panel>
         <div className="bg-paper px-6 py-5 sm:px-8 lg:col-span-2">
@@ -178,7 +178,7 @@ function Skipped({ week }: { week: Summary }) {
         {count} <span className="font-sans text-sm font-normal text-muted">videos</span>
       </p>
       <p className="font-display text-2xl font-semibold tracking-tight">
-        ~{formatDuration(savedMs)} <span className="font-sans text-sm font-normal text-muted">not spent</span>
+        ~{formatDuration(savedMs)} <span className="font-sans text-sm font-normal text-muted">estimated time saved</span>
       </p>
       <p className="font-mono text-[11px] text-faint sm:ml-auto">
         {byCategory.slice(0, 3).map((c) => `${CATEGORY_LABELS[c.category]} ${c.count}`).join(" · ")}

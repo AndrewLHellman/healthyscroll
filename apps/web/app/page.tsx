@@ -35,13 +35,12 @@ function Hero() {
           TigerHacks 2026 · Health track
         </p>
         <h1 className="mt-6 font-display text-[2.6rem] font-semibold leading-[1.02] tracking-[-0.03em] sm:text-6xl">
-          Skip the Reels you never wanted to see. Before they hook you.
+          Take back your feed.
         </h1>
         <p className="mt-6 max-w-2xl text-lg leading-relaxed text-muted">
-          Healthy Scroll is a Safari extension for iPhone. It reads each Reel as it lands in your
-          Instagram feed and skips anything that matches what you asked to avoid, in about 200
-          milliseconds, without you lifting a finger. You write the rule in plain English. It does
-          the scrolling.
+          Watching something doesn’t always mean you want more of it. Healthy Scroll lets you
+          set your own limits on what shows up in your feed, from rage bait to body comparison.
+          Tell it what you’d like to avoid, and it skips matching Reels in Safari on your iPhone.
         </p>
         <div className="mt-8 flex flex-wrap items-center gap-4">
           <a
@@ -56,7 +55,7 @@ function Hero() {
           </a>
         </div>
         <p className="mt-5 text-xs text-faint">
-          Free. Open source. Frames are described, then discarded.
+          Free and open source. No account required.
         </p>
       </div>
 
@@ -75,8 +74,8 @@ function Prompts() {
       <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 sm:py-28">
         <SectionHeading
           eyebrow="Your prompt"
-          title="Write it like you’d say it."
-          body="No categories to tick, no sliders. One box, your words. Jev reads intent, so “stuff that makes me feel worse about myself” works as well as a list. Edit the prompt and watch the feed change."
+          title="Decide what belongs in your feed."
+          body="Maybe you’re cutting back on drinking, tired of political arguments, or done comparing yourself to strangers. Describe what you’d like to see less of. Try your own prompt or choose an example below."
         />
         <div className="mt-12">
           <PromptPlayground />
@@ -94,14 +93,14 @@ function Week() {
       <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 sm:py-28">
         <SectionHeading
           eyebrow="Your week"
-          title="It also keeps a tally. Of what actually holds you."
-          body="The same Jev call that decides skip-or-keep also says what kind of video it was, for free. Add how long you stayed on each one and you get a week you can read: not a screen-time number, but which Reels you can’t put down. The dwell tally stays on your phone."
+          title="Get to know your scrolling habits."
+          body="See which topics take up your time and which ones you tend to linger on. Your weekly summary can help you decide whether your feed is how you want to spend that time, and what you’d like to change. This record stays on your phone."
         />
         <div className="mt-12">
           <WeekMock />
         </div>
         <p className="mt-6 max-w-3xl text-sm text-muted">
-          Nothing to check daily. The popup shows one line about today; the full week is a click away when you want it.
+          Here’s an example week. In the extension, tap today’s summary to see your own.
         </p>
       </div>
     </section>
@@ -113,35 +112,35 @@ function Week() {
 const FAQ = [
   {
     q: "Where does it work?",
-    a: "Instagram Reels in Safari on iPhone. It’s a browser extension, so it can’t reach inside the Instagram app; open instagram.com in Safari instead. TikTok in Chrome works too. YouTube Shorts is next.",
+    a: "On instagram.com in Safari on iPhone, and on TikTok in Chrome. It doesn’t work inside the Instagram app. Support for YouTube Shorts is planned.",
   },
   {
-    q: "Do I need anything else?",
-    a: "No. Sign in with Google if you want your prompt to follow you between devices; otherwise just write it and go.",
+    q: "Do I need an account?",
+    a: "No. You can save your prompt on your device without signing in. Sign in with Google to sync it between devices.",
   },
   {
     q: "Does it slow scrolling down?",
-    a: "No. The check runs alongside the Reel, not in front of it. It takes about 200 ms, so a skipped Reel is usually gone before you see it.",
+    a: "Reels keep playing while they’re checked. You may see part of a Reel before it gets skipped. If a check fails, the Reel keeps playing.",
   },
   {
     q: "Will it skip things I wanted?",
-    a: "Sometimes, early on. Only confident matches get skipped; anything in the middle gets a second look rather than a guess. Change a word in your prompt and it follows.",
+    a: "It can make mistakes. Healthy Scroll skips a Reel only when it’s confident the content matches your prompt. If it skips too much, try making your prompt more specific.",
   },
   {
     q: "What’s doing the deciding?",
-    a: "Jev, an evaluation model by TypeSafe AI, reads the caption and comments and returns a probability, not prose. When the words aren’t enough, Moondream, a small vision model, describes one frame in a sentence and Jev decides again.",
+    a: "An AI model called Jev checks the caption and comments against your prompt. If it’s unsure, a second model, Moondream, describes a video frame so Jev can check again.",
   },
   {
     q: "Where does my data go?",
-    a: "Captions and comments go to our server as text and aren’t kept. When a frame is needed, the server fetches it, describes it, and throws it away. If you sign in, we store your prompt and a log of what was skipped so your dashboard can count it. Your week’s tally stays on your phone.",
+    a: "Your prompt, captions, and comments are sent to our server for evaluation. Captions and comments aren’t stored. If a video frame is needed, the server describes it and discards the image. Signing in saves your prompt and a skip log for your dashboard. Your watch-time record stays on your phone.",
   },
   {
-    q: "What does the tally track?",
-    a: "Per Reel: its category, how long it was on screen, and whether it was skipped. Not who posted it, not what you liked. Categories are broad on purpose: “relationships & drama”, not a profile of you.",
+    q: "What does the weekly summary track?",
+    a: "Each Reel’s category, how long it was on screen, and whether it was skipped. The summary groups videos into topics such as “relationships & drama”. It doesn’t record creators or likes.",
   },
   {
     q: "What does it cost?",
-    a: "Nothing. Open source, built at TigerHacks 2026. Jev costs fractions of a cent per thousand Reels.",
+    a: "Healthy Scroll is free and open source. We built it at TigerHacks 2026.",
   },
 ];
 
@@ -153,7 +152,7 @@ function Faq() {
           <div>
             <p className="text-xs font-medium uppercase tracking-wider text-faint">FAQ</p>
             <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight sm:text-4xl">
-              It sees your feed. It doesn’t keep it.
+              A few things to know.
             </h2>
           </div>
           <dl className="grid gap-x-10 gap-y-9 sm:grid-cols-2">
@@ -179,11 +178,11 @@ function FinalCta() {
         <div className="max-w-xl">
           <p className="text-xs font-medium uppercase tracking-wider text-faint">Setup</p>
           <h2 className="mt-3 font-display text-3xl font-semibold leading-tight tracking-tight sm:text-5xl">
-            One text box. That’s the setup.
+            Make room for what you want to watch.
           </h2>
           <p className="mt-5 text-lg leading-relaxed text-muted">
-            No streaks, no scores, no nagging. The algorithm already optimises for your attention;
-            this adds one rule you wrote, and a tally you can look at when you feel like it.
+            You can enjoy Reels and still set limits on what you see. Start with something
+            you’d like less of in your feed. You can change your prompt whenever you want.
           </p>
           <a
             href="#install"

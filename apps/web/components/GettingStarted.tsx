@@ -8,17 +8,17 @@ import { MarkImage } from "./Mark";
 const STEPS = [
   {
     title: "Install it",
-    body: "From the App Store. Then, in Safari, tap aA → Manage Extensions and switch Healthy Scroll on. You do this once.",
+    body: "Install Healthy Scroll from the App Store, then turn it on in Safari’s extension settings.",
     screen: <InstallScreen />,
   },
   {
     title: "Say what to skip",
-    body: "One text box, your words. Whatever you’d rather not scroll past. Change it whenever; it takes effect on the next Reel.",
+    body: "Describe the content you want to avoid and save your prompt. You can change it at any time.",
     screen: <PromptScreen />,
   },
   {
     title: "Open Instagram in Safari",
-    body: "instagram.com, not the app. Scroll like you always do. Reels that match your rule are gone before they play.",
+    body: "Go to instagram.com and browse Reels. Healthy Scroll checks each one and skips content that matches your prompt.",
     screen: <FeedScreen />,
   },
 ];
@@ -30,10 +30,10 @@ export function GettingStarted() {
         <div className="max-w-2xl">
           <p className="text-xs font-medium uppercase tracking-wider text-faint">Getting started</p>
           <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight sm:text-4xl">
-            Set it up once. Then forget it’s there.
+            Get started in Safari.
           </h2>
           <p className="mt-4 text-lg leading-relaxed text-muted">
-            It lives in Safari on your iPhone, next to Instagram. Nothing to keep open, nothing to check.
+            Install the extension, save your prompt, and open Instagram in your browser.
           </p>
         </div>
 
@@ -51,9 +51,8 @@ export function GettingStarted() {
         </ol>
 
         <p className="mt-6 max-w-3xl text-sm text-muted">
-          Under the hood: Jev decides from the words in about 200 ms. A vision model looks at a single frame only when
-          the words can’t decide, and the frame isn’t kept. Errors never skip; if a model is unreachable, the Reel plays
-          like normal.
+          Healthy Scroll checks captions and comments first. If it needs more context, it uses a description
+          of a video frame, then discards the image. If a check fails, the Reel keeps playing.
         </p>
       </div>
     </section>

@@ -42,7 +42,7 @@ export function PopupMock() {
         </p>
 
         <p className="mt-3 text-[11px] leading-snug text-faint">
-          Frames are described and discarded, never stored. Your tally stays on this phone.
+          Video frames aren’t stored. Your watch-time record stays on this phone.
         </p>
       </div>
     </div>
