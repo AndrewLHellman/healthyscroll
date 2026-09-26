@@ -86,3 +86,43 @@ export async function getAccessToken(): Promise<string | null> {
   const { data } = await supabase.auth.getSession();
   return data.session?.access_token ?? null;
 }
+
+// One refresh at a time: every in-flight Reel may hit a 401 at once.
+let refreshing: Promise<string | null> | null = null;
+
+async function refreshAccessToken(): Promise<string | null> {
+  refreshing ??= supabase.auth
+    .refreshSession()
+    .then(async ({ data, error }) => {
+      if (error || !data.session) {
+        // The refresh token is dead too (expired/revoked). Drop the local session so
+        // the popup shows "Sign in" instead of every Reel failing silently.
+        console.warn("[auth] session expired and couldn't be refreshed; sign in again", error);
+        await supabase.auth.signOut({ scope: "local" });
+        return null;
+      }
+      return data.session.access_token;
+    })
+    .finally(() => {
+      refreshing = null;
+    });
+  return refreshing;
+}
+
+/**
+ * fetch() with the user's Supabase token. On 401 (seen 2026-09-26: the service
+ * worker kept sending an expired token and both APIs rejected every Reel), force
+ * one token refresh and retry once.
+ */
+export async function authedFetch(url: string, init: RequestInit = {}): Promise<Response> {
+  const token = await getAccessToken();
+  if (!token) throw new Error("not signed in");
+  const withToken = (t: string) =>
+    fetch(url, { ...init, headers: { ...(init.headers as Record<string, string>), authorization: `Bearer ${t}` } });
+
+  const res = await withToken(token);
+  if (res.status !== 401) return res;
+  const fresh = await refreshAccessToken();
+  if (!fresh) throw new Error("not signed in (session expired)");
+  return withToken(fresh);
+}
