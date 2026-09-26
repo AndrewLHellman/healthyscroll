@@ -141,34 +141,53 @@ async function decide(info: ReelInfo, context: VideoContext, policy: UserPolicy)
   }
 
   const hasMedia = Boolean(info.manifest || info.videoUrl);
+  const t0 = performance.now();
+  const ms = () => `${Math.round(performance.now() - t0)}ms`;
+
+  console.log(`[reels] ${info.code} jev(text) ->`);
   const textP = evaluate({ policy: { prompt: policy.prompt }, context });
   // The category rides on the text pass; keep it whichever pass decides.
   textP.then((d) => noteCategory(info.code, d), () => {});
-  textP.catch((err) => console.warn("[reels] text pass failed", info.code, err));
+  textP.then(
+    (d) => console.log(`[reels] ${info.code} jev(text) <- ${d.verdict} p=${d.violatesProbability.toFixed(2)} in ${ms()}`),
+    (err) => console.warn(`[reels] ${info.code} jev(text) failed after ${ms()}`, err),
+  );
 
   // What's on screen, as text. Never throws: null means Jev goes on the Reel's text alone.
-  const descriptionP: Promise<string | null> = hasMedia
-    ? describeAndWait({
-        videoId: info.id,
-        platform: "instagram",
-        // Prefer the manifest: the server range-fetches only what it needs.
-        ...(info.manifest ? { manifest: info.manifest } : { videoUrl: info.videoUrl }),
-        posterUrl: info.posterUrl,
-      }).catch((err) => {
-        console.warn("[reels] describe failed", info.code, err);
+  let descriptionP: Promise<string | null> = Promise.resolve(null);
+  if (hasMedia) {
+    console.log(`[reels] ${info.code} vision ->`, info.manifest ? "manifest" : "videoUrl");
+    descriptionP = describeAndWait({
+      videoId: info.id,
+      platform: "instagram",
+      // Prefer the manifest: the server range-fetches only what it needs.
+      ...(info.manifest ? { manifest: info.manifest } : { videoUrl: info.videoUrl }),
+      posterUrl: info.posterUrl,
+    }).then(
+      (description) => {
+        console.log(`[reels] ${info.code} vision <- ${description ? `"${description}"` : "no description"} in ${ms()}`);
+        return description;
+      },
+      (err) => {
+        console.warn(`[reels] ${info.code} vision failed after ${ms()}`, err);
         return null;
-      })
-    : Promise.resolve(null);
+      },
+    );
+  } else {
+    console.log(`[reels] ${info.code} vision skipped: no media`);
+  }
 
   // Jev on text + description is the final word; it needs the description first.
   const fullP = descriptionP.then(async (description): Promise<Judgement | null> => {
     if (!description) return null;
     try {
+      console.log(`[reels] ${info.code} jev(text+description) ->`);
       const d = await evaluate({
         policy: { prompt: policy.prompt },
         context,
         frames: [{ videoId: info.id, atMs: 0, caption: description }],
       });
+      console.log(`[reels] ${info.code} jev(text+description) <- ${d.verdict} p=${d.violatesProbability.toFixed(2)} in ${ms()}`);
       return {
         verdict: d.verdict === "skip" ? "skip" : "allow",
         stage: "visual",
