@@ -2,7 +2,7 @@ import { Wordmark } from "./Wordmark";
 import { AuthButton } from "@/app/AuthButton";
 
 const LINKS = [
-  { href: "#how-it-works", label: "How it works" },
+  { href: "#getting-started", label: "Getting started" },
   { href: "#prompts", label: "Prompts" },
   { href: "#insights", label: "Your week" },
   { href: "#faq", label: "FAQ" },

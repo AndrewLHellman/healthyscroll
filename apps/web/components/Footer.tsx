@@ -12,7 +12,7 @@ const COLUMNS = [
   {
     title: 'Product',
     links: [
-      { label: 'How it works', href: '#how-it-works' },
+      { label: 'Getting started', href: '#getting-started' },
       { label: 'Prompt playground', href: '#prompts' },
       { label: 'Your week', href: '#insights' },
       { label: 'Privacy', href: '#faq' },

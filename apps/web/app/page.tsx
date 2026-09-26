@@ -1,6 +1,7 @@
 import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
 import { PipelineDemo } from "@/components/PipelineDemo";
+import { GettingStarted } from "@/components/GettingStarted";
 import { PromptPlayground } from "@/components/PromptPlayground";
 import { WeekMock } from "@/components/WeekMock";
 import { PopupMock } from "@/components/PopupMock";
@@ -13,7 +14,7 @@ export default function Home() {
       <Nav />
       <main>
         <Hero />
-        <HowItWorks />
+        <GettingStarted />
         <Prompts />
         <Week />
         <Faq />
@@ -51,8 +52,8 @@ function Hero() {
           >
             Get it for iPhone
           </a>
-          <a href="#how-it-works" className="rounded-md text-sm text-muted transition-colors hover:text-ink">
-            See how it works ↓
+          <a href="#getting-started" className="rounded-md text-sm text-muted transition-colors hover:text-ink">
+            How to set it up ↓
           </a>
         </div>
         <p className="mt-5 text-xs text-faint">
@@ -62,85 +63,6 @@ function Hero() {
 
       <div className="mt-14">
         <PipelineDemo />
-      </div>
-    </section>
-  );
-}
-
-/* -------------------------------------------------------- how it works */
-
-const STAGES = [
-  {
-    n: "01",
-    time: "~200 ms",
-    title: "Read the words",
-    body: "The moment a new Reel lands, its caption, hashtags, audio and visible comments go to Jev, a model that answers one question with a calibrated probability: does this match what you asked to skip? No prose, nothing to parse. Most videos are decided right here, before you’ve registered them.",
-    trace: [
-      ["text", "jev", "does this match the policy?"],
-      ["", "", "0.96 · skip · 184 ms"],
-    ],
-  },
-  {
-    n: "02",
-    time: "< 3 s",
-    title: "Look closer if it’s unsure",
-    body: "Captions lie. When Jev lands in the middle, Healthy Scroll sends the Reel’s video link to our server, which pulls a single frame and hands it to Moondream, a small vision model. Moondream describes what it sees; that one sentence goes back to Jev with the rest. The frame is discarded the moment it’s described.",
-    trace: [
-      ["visual", "moondream", "“a crowded bar, people holding drinks”"],
-      ["", "jev", "0.92 · skip · 2.1 s"],
-    ],
-  },
-  {
-    n: "03",
-    time: "a few s in",
-    title: "Take a second look as it plays",
-    body: "Reels turn. A cooking clip becomes a drinking clip at second eight. So a few seconds into anything still playing, one more frame gets the same treatment. If it’s become something you skipped, it’s gone, mid-sentence.",
-    trace: [
-      ["monitor", "moondream", "“two people pouring shots at a counter”"],
-      ["", "jev", "0.88 · skip · 6.2 s in"],
-    ],
-  },
-];
-
-function HowItWorks() {
-  return (
-    <section id="how-it-works" className="border-t border-line bg-mist/60">
-      <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 sm:py-28">
-        <SectionHeading
-          eyebrow="How it works"
-          title="Three checks. A few seconds at most. Frames are described, not kept."
-          body="Fast and cheap first, careful only when it has to be. Each stage only runs if the one before it couldn’t decide."
-        />
-
-        <ol className="mt-14 grid gap-px overflow-hidden rounded-2xl border border-line bg-line lg:grid-cols-3">
-          {STAGES.map((s) => (
-            <li key={s.n} className="flex flex-col gap-6 bg-paper p-7 sm:p-8">
-              <div className="flex items-baseline justify-between">
-                <span className="font-display text-4xl font-semibold tracking-tight text-ink/90">{s.n}</span>
-                <span className="font-mono text-xs text-faint">{s.time}</span>
-              </div>
-              <div>
-                <h3 className="font-display text-xl font-semibold tracking-tight">{s.title}</h3>
-                <p className="mt-3 text-[15px] leading-relaxed text-muted">{s.body}</p>
-              </div>
-              <div className="mt-auto flex flex-col gap-1.5 rounded-lg border border-line bg-mist/70 p-3 font-mono text-xs leading-relaxed">
-                {s.trace.map(([stage, model, text], i) => (
-                  <div key={i} className="grid grid-cols-[60px_1fr] gap-2">
-                    <span className="uppercase tracking-wider text-faint">{stage}</span>
-                    <span className="min-w-0">
-                      <span className={`mr-2 ${model === "jev" ? "text-accent-ink" : "text-muted"}`}>{model}</span>
-                      <span className={text.includes("skip") ? "text-skip" : "text-ink"}>{text}</span>
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </li>
-          ))}
-        </ol>
-
-        <p className="mt-6 text-sm text-muted">
-          Errors never skip. If a model is unreachable, the Reel plays like normal.
-        </p>
       </div>
     </section>
   );
@@ -192,35 +114,35 @@ function Week() {
 const FAQ = [
   {
     q: "Where does it work?",
-    a: "Instagram Reels, in Safari on iPhone. Open instagram.com in Safari, turn the extension on once, and scroll like normal. It’s a browser extension, so Safari is the way in; it can’t reach inside the Instagram app. TikTok in Chrome works too, and YouTube Shorts is next.",
+    a: "Instagram Reels in Safari on iPhone. It’s a browser extension, so it can’t reach inside the Instagram app; open instagram.com in Safari instead. TikTok in Chrome works too. YouTube Shorts is next.",
   },
   {
     q: "Do I need anything else?",
-    a: "No. Safari, an Instagram account, and the extension. Sign in with Google if you want your prompt to follow you between devices.",
+    a: "No. Sign in with Google if you want your prompt to follow you between devices; otherwise just write it and go.",
   },
   {
     q: "Does it slow scrolling down?",
-    a: "No. Decisions run alongside the Reel, not in front of it. The text check returns in about 200 ms; when that says skip, you rarely see the first frame.",
+    a: "No. The check runs alongside the Reel, not in front of it. It takes about 200 ms, so a skipped Reel is usually gone before you see it.",
   },
   {
     q: "Will it skip things I wanted?",
-    a: "Occasionally, at first. Only confident matches get skipped; the uncertain middle gets a second look, not a guess. Tighten or loosen a word and it follows.",
+    a: "Sometimes, early on. Only confident matches get skipped; anything in the middle gets a second look rather than a guess. Change a word in your prompt and it follows.",
   },
   {
     q: "What’s doing the deciding?",
-    a: "Jev, an evaluation model by TypeSafe AI, through Vercel AI Gateway. It returns probabilities instead of prose, which is why it’s fast and nearly free per video. Moondream, a small vision model, describes a frame in one sentence when the text alone can’t decide.",
+    a: "Jev, an evaluation model by TypeSafe AI, reads the caption and comments and returns a probability, not prose. When the words aren’t enough, Moondream, a small vision model, describes one frame in a sentence and Jev decides again.",
   },
   {
     q: "Where does my data go?",
-    a: "Caption, hashtags and comments go to our server as text, for the decision, and aren’t kept. When the text can’t decide, the server fetches one frame of the Reel, has Moondream describe it, and discards it; frames are never stored. If you sign in, we store your prompt and a log of skips (which Reel, when, which check caught it) so your dashboard can count them. The week’s dwell tally lives on your phone. Clear it any time.",
+    a: "Captions and comments go to our server as text and aren’t kept. When a frame is needed, the server fetches it, describes it, and throws it away. If you sign in, we store your prompt and a log of what was skipped so your dashboard can count it. Your week’s tally stays on your phone.",
   },
   {
     q: "What does the tally track?",
-    a: "Per Reel: which of fourteen categories Jev put it in, how long it was on screen, and whether it was skipped. Not the video itself, not who posted it, not what you liked. Categories are broad on purpose: “relationships & drama”, not a profile of you.",
+    a: "Per Reel: its category, how long it was on screen, and whether it was skipped. Not who posted it, not what you liked. Categories are broad on purpose: “relationships & drama”, not a profile of you.",
   },
   {
     q: "What does it cost?",
-    a: "Nothing. Open source, built over a weekend at TigerHacks 2026. Jev costs us fractions of a cent per thousand videos.",
+    a: "Nothing. Open source, built at TigerHacks 2026. Jev costs fractions of a cent per thousand Reels.",
   },
 ];
 
@@ -230,9 +152,9 @@ function Faq() {
       <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 sm:py-28">
         <div className="grid gap-10 lg:grid-cols-[1fr_2fr]">
           <div>
-            <p className="text-xs font-medium uppercase tracking-wider text-faint">Straight answers</p>
+            <p className="text-xs font-medium uppercase tracking-wider text-faint">FAQ</p>
             <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight sm:text-4xl">
-              Nothing to click open.
+              It sees your feed. It doesn’t keep it.
             </h2>
           </div>
           <dl className="grid gap-x-10 gap-y-9 sm:grid-cols-2">
