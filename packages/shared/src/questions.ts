@@ -29,17 +29,16 @@ export const NO_POLICY = "(none — the user has not written a policy; nothing v
 export const jevQuestions = {
   violates: {
     type: "boolean",
+    // Worded as "is it about / does it feature a topic in the policy", not "does it
+    // conflict with the policy": on real Reels with policy "animals" (2026-09-26) this
+    // moved cat/turtle/dog videos from ~0.72 to 0.99 while non-matches stayed <= 0.06.
     instructions:
-      "The user wrote a policy describing content they do NOT want to see while scrolling. " +
-      "Does this video conflict with that policy? Judge the video, not the policy. " +
-      "If the policy is empty or says none was written, the answer is false.",
+      "`policy` lists topics the viewer does not want to see. Is this short video about, or does it " +
+      "feature, any of those topics? Judge from the video's description, hashtags, author, audio title, " +
+      "comments and visual captions. If the policy is empty or says none was written, the answer is false.",
     criteria: {
-      true:
-        "The video's description, hashtags, comments, audio, or visual captions indicate content " +
-        "the policy asks to filter out, or content clearly in the same category.",
-      false:
-        "Nothing in the available signals suggests the video matches what the policy filters. " +
-        "Unrelated or benign content, or no policy.",
+      true: "The video is about or clearly features at least one topic listed in the policy.",
+      false: "The video is not about and does not feature any topic listed in the policy, or there is no policy.",
     },
   },
   category: {
@@ -58,7 +57,9 @@ export const jevQuestions = {
  */
 export function buildJevState(req: EvaluateRequest) {
   const { policy, context, frames } = req;
-  return {
+  // Jev rejects state that isn't strictly JSON-compatible, and `undefined`
+  // fields (no comments, no frames on the text pass...) count. Drop them.
+  return withoutUndefined({
     policy: policy.prompt.trim() || NO_POLICY,
     video: {
       author: context.author,
@@ -74,5 +75,17 @@ export function buildJevState(req: EvaluateRequest) {
       caption: f.caption,
       policyAnswer: f.policyAnswer,
     })),
-  };
+  });
+}
+
+function withoutUndefined<T>(value: T): T {
+  if (Array.isArray(value)) return value.map(withoutUndefined) as T;
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([, v]) => v !== undefined)
+        .map(([k, v]) => [k, withoutUndefined(v)]),
+    ) as T;
+  }
+  return value;
 }

@@ -27,6 +27,15 @@ export default defineManifest({
       js: ["src/content/index.ts"],
       run_at: "document_idle",
     },
+    // Instagram Reels, part 1 (isolated world): active Reel + skip, talks to background.
+    {
+      matches: ["https://www.instagram.com/*"],
+      js: ["src/content/instagramMain.ts"],
+      run_at: "document_start",
+    },
+    // Part 2, the main-world hook that reads Reel media from Instagram's API
+    // responses, is public/instagram-hook.js, appended to the built manifest by
+    // vite.config.ts (CRXJS can't ship it unbundled; see that file).
   ],
   permissions: [
     // Persist the user's policy.
@@ -38,8 +47,12 @@ export default defineManifest({
     "identity",
   ],
   host_permissions: [
-    // The feed we observe.
+    // The feeds we observe.
     "https://www.tiktok.com/*",
+    "https://www.instagram.com/*",
+    // Vision service (apps/vision): local dev, and its prod home once deployed.
+    "http://localhost:8000/*",
+    "https://vision.healthyscroll.net/*",
     // Local Moondream Station (on-device VLM).
     "http://localhost:2020/*",
     // Our decision API (Jev lives behind it).

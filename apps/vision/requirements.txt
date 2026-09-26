@@ -1,0 +1,6 @@
+# API server + hosted scorers (no GPU needed)
+fastapi>=0.115
+uvicorn[standard]>=0.30
+httpx>=0.27
+pillow>=10
+python-dotenv>=1.0
