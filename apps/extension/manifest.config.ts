@@ -26,6 +26,10 @@ const HOSTS = [
   SUPABASE_HOST,
 ];
 
+const ICONS = Object.fromEntries(
+  [16, 32, 48, 96, 128, 256, 512].map((size) => [size, `assets/icons/icon-${size}.png`]),
+);
+
 export default function manifestFor(target: Target) {
   return defineManifest({
     manifest_version: 3,
@@ -38,9 +42,12 @@ export default function manifestFor(target: Target) {
       // URLs (https://<id>.chromiumapp.org/) stay stable. Private key: key.pem (gitignored).
       key: "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAmWq9d2PbJ7Ok/a9wmf+sYj6ln+gswdgEX0yA1icbPq6hPLURR1BH0wtcF2NRP7SmWlZPJDWq8LmonTC6vJqni8stChQjhfAoSjoDNJy7LH2hc4AIiLDtdn2ZWPZgTUtLSjeKYsUiaBUiWDA307s5pupEf2YAI0s1QzXoRkTWXXggga8vTacZdGsyAAT2hGWsIj/MA4u3/bOunD3rSecf4o3N02cibaQxhpJrPv+GzFPNutfNZe2xoZKAShLfWvqppCDdodGDHVrrIOW6HbRnof+0f017VBUnOjqiIt0QqkEtyTc/lKDjyR25P4QxMH4+V/65BKnjmzmYDBxCshmKMQIDAQAB",
     }),
+    // The website's mark, rendered by apps/ios/scripts/make_icons.py into public/assets/icons/.
+    icons: ICONS,
     action: {
       default_popup: "src/popup/index.html",
       default_title: "Healthy Scroll",
+      default_icon: ICONS,
     },
     // Safari's background is added by vite.config.ts as a classic script
     // (it can't run CRXJS's module service worker).

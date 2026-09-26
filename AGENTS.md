@@ -60,7 +60,7 @@ As of 2026-09-26:
 - **iOS Safari, simulator:** end to end works: the Instagram hook, content script and background run, every Reel is discovered ahead of time and judged in `reels.ts`, and a matching Reel is skipped automatically (the feed scrolls on mobile). Verified with Jev text skips against a local `dev:web`; vision works locally but isn't deployed.
 - **Safari sign-in** (`/connect` handoff) verified in the simulator against a local `dev:web`.
 - **Chrome:** TikTok adapter (scrape + skip) verified on the live For You page; Instagram path added with the vision service; its hook was proven against the live site with `apps/vision/bench/ig_hook.js`.
-- App and extension icons are the converter's placeholders.
+- App and extension icons are the website's mark, rendered from `apps/web/app/icon.svg` by `python3 apps/ios/scripts/make_icons.py` (re-run after changing the mark).
 
 On TikTok the content script observer is gated behind `VITE_HS_ENABLE_CONTENT=true`; `VITE_HS_DEBUG=true` adds console logging and the `hs:probe` / `hs:skip` console hooks. Do not drive a browser or load the extension unless asked — see `docs/ROADMAP.md` for the order of operations.
 

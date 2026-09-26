@@ -42,6 +42,12 @@ body {
     text-align: center;
 }
 
+/* The app icon on a page of the same white: round it like the home screen does and give it an edge. */
+body > img {
+    border-radius: 22%;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+
 h1 {
     margin: 0;
     font: -apple-system-title1;
