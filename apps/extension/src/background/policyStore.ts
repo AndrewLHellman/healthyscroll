@@ -21,6 +21,11 @@ export async function setPolicy(patch: Partial<UserPolicy>): Promise<UserPolicy>
   return next;
 }
 
+/** Overwrites the local policy as-is, keeping its updatedAt (used when pulling from Supabase). */
+export async function replacePolicy(policy: UserPolicy): Promise<void> {
+  await chrome.storage.sync.set({ [KEY]: policy });
+}
+
 export function onPolicyChange(cb: (policy: UserPolicy) => void): () => void {
   const listener = (changes: Record<string, chrome.storage.StorageChange>) => {
     if (changes[KEY]) {

@@ -10,6 +10,7 @@ import { evaluate } from "./jevClient";
 import * as moondream from "./moondreamClient";
 import { captureFrame } from "./frameCapture";
 import { sendToTab } from "../lib/messages";
+import { recordSkip } from "./sync";
 
 /**
  * The decision pipeline, per video. See docs/DECISION_PIPELINE.md.
@@ -116,6 +117,7 @@ async function applyDecision(session: Session, decision: Decision): Promise<bool
   if (decision.verdict === "skip") {
     await sendToTab(session.tabId, { type: "SKIP_VIDEO", videoId: session.context.videoId, decision });
     cancel(session.tabId);
+    void recordSkip(session.context, decision);
     return true;
   }
   await sendToTab(session.tabId, { type: "DECISION", decision });

@@ -5,7 +5,8 @@ import { sendAuthMessage, type AuthState, type PopupToBackground } from "../lib/
 
 /**
  * The whole UI: one switch, one text box. Deliberately minimal.
- * The same policy can later be edited on healthyscroll.net (see docs/ROADMAP.md).
+ * The policy is synced to Supabase by the background worker (background/sync.ts),
+ * so it's also editable on the website.
  */
 export function Popup() {
   const [policy, setLocal] = useState<UserPolicy | null>(null);
@@ -15,18 +16,23 @@ export function Popup() {
   const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
-    void getPolicy().then(setLocal);
     void runAuth({ type: "AUTH_GET" });
   }, []);
 
   // Sign-in runs in the background worker; if the popup closes mid-flow it
-  // picks up the new session next time it opens.
+  // picks up the new session next time it opens. The background pulls the
+  // saved policy from Supabase before replying, so read it afterwards.
   async function runAuth(msg: PopupToBackground) {
     setAuthBusy(true);
     setAuthError(null);
     const res = await sendAuthMessage(msg);
-    if (res.ok) setAuth(res.auth);
-    else setAuthError(res.error);
+    if (res.ok) {
+      setAuth(res.auth);
+    } else {
+      setAuthError(res.error);
+      setAuth((a) => a ?? { email: null }); // show the sign-in screen rather than nothing
+    }
+    setLocal(await getPolicy());
     setAuthBusy(false);
   }
 

@@ -1,4 +1,5 @@
 import { AuthButton } from "./AuthButton";
+import { Dashboard } from "./Dashboard";
 
 /**
  * Landing page. Placeholder copy + layout; the real design pass comes later.
@@ -23,15 +24,7 @@ export default function Home() {
         </p>
       </div>
 
-      <label className="flex flex-col gap-2">
-        <span className="text-xs text-neutral-500">Skip anything that's…</span>
-        <textarea
-          className="min-h-32 resize-none rounded-xl border border-neutral-200 p-4 text-sm leading-relaxed outline-none focus:border-neutral-400"
-          placeholder="e.g. gambling, drinking, thirst-trap content, anything that makes me feel worse about myself"
-          // TODO: sync to the extension via externally_connectable (docs/ROADMAP.md).
-          readOnly
-        />
-      </label>
+      <Dashboard />
 
       <a
         href="#"

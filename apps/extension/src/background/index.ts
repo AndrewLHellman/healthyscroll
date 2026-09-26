@@ -7,19 +7,29 @@ import type {
 import { getPolicy } from "./policyStore";
 import { cancel, onVideoChanged } from "./orchestrator";
 import { getAuthState, signIn, signOut } from "./auth";
+import { maybePullPolicy, pullPolicy, startPolicySync } from "./sync";
 
 /**
  * Background service worker entry. Routes messages from content scripts into
  * the orchestrator, and popup auth requests into auth.ts. Keep this file thin;
- * logic lives in orchestrator.ts / auth.ts.
+ * logic lives in orchestrator.ts / auth.ts / sync.ts.
  */
+
+startPolicySync();
+
+/** Best-effort: the popup should still open if Supabase is unreachable. */
+const pullQuietly = () => pullPolicy().catch((err: unknown) => console.error("[sync]", err));
 
 function handleAuth(msg: PopupToBackground): Promise<AuthState> {
   switch (msg.type) {
+    // Pull before replying so the popup shows the latest saved prompt.
     case "AUTH_GET":
-      return getAuthState();
+      return pullQuietly().then(getAuthState);
     case "AUTH_SIGN_IN":
-      return signIn();
+      return signIn().then(async (auth) => {
+        await pullQuietly();
+        return auth;
+      });
     case "AUTH_SIGN_OUT":
       return signOut().then(getAuthState);
   }
@@ -49,6 +59,8 @@ chrome.runtime.onMessage.addListener((msg: ContentToBackground | PopupToBackgrou
     case "VIDEO_CHANGED":
     case "VIDEO_CONTEXT_UPDATED":
       // An update restarts the pipeline for the same video, now with comments.
+      // Website edits land on the next video (pull is throttled and async).
+      maybePullPolicy();
       void getPolicy().then((policy) => onVideoChanged(tabId, windowId, msg.context, policy));
       break;
     case "VIDEO_ENDED":

@@ -24,7 +24,7 @@ Status as of 2026-09-26: **TikTok adapter verified on the live For You page** (s
 ## Phase 3 — polish for demo
 
 - [ ] Landing page design pass (`apps/web/app/page.tsx`). Keep it one screen.
-- [ ] Sync policy from healthyscroll.net → extension via `externally_connectable` in the manifest + `chrome.runtime.sendMessage(extensionId, …)` from the page.
+- [x] Sync policy between healthyscroll.net and the extension — via the Supabase `policies` table (`background/sync.ts`), newest `updated_at` wins.
 - [ ] Deploy web to Vercel; point extension prod `API_BASE_URL` at it.
 - [ ] Pack the extension.
 

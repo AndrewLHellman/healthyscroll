@@ -1,32 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { createClient, type User } from "@supabase/supabase-js";
-import { SUPABASE_ANON_KEY, SUPABASE_URL } from "@healthyscroll/shared";
+import { supabase, useUser } from "@/lib/supabaseBrowser";
 
-/**
- * Google sign-in for the landing page, via Supabase (same project as the
- * extension). PKCE: Google → Supabase → back here with ?code=, which the client
- * exchanges automatically on load (detectSessionInUrl).
- */
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: { flowType: "pkce", detectSessionInUrl: true, persistSession: true },
-});
-
+/** Google sign-in / sign-out for the landing page. */
 export function AuthButton() {
-  const [user, setUser] = useState<User | null | undefined>(undefined);
-
-  useEffect(() => {
-    void supabase.auth.getSession().then(({ data }) => setUser(data.session?.user ?? null));
-    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      // Drop the one-time ?code= from the address bar after the exchange.
-      if (session && window.location.search.includes("code=")) {
-        window.history.replaceState(null, "", window.location.pathname);
-      }
-    });
-    return () => data.subscription.unsubscribe();
-  }, []);
+  const user = useUser();
 
   if (user === undefined) return <div className="h-8" />;
 

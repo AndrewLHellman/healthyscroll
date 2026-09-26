@@ -45,4 +45,4 @@ Full detail in [DECISION_PIPELINE.md](./DECISION_PIPELINE.md); component layout 
 
 - Platform: **TikTok web** (`tiktok.com`) only. The adapter pattern (`apps/extension/src/content/tiktok.ts`) leaves room for Instagram Reels / YouTube Shorts later.
 - Config surface: extension popup. Website is a landing page + the API; syncing the policy from the website into the extension is a stretch goal.
-- Google sign-in via Supabase (required to call `/api/evaluate`). No database beyond Supabase Auth.
+- Google sign-in via Supabase (required to call `/api/evaluate`). Supabase Postgres stores each user's policy and a skip log (ids + decision only); schema in `supabase/migrations/`.

@@ -18,7 +18,7 @@ const storage: SupportedStorage = {
   removeItem: (key) => chrome.storage.local.remove(key),
 };
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     storage,
     flowType: "pkce",
@@ -59,6 +59,11 @@ export async function signOut(): Promise<void> {
 export async function getAuthState(): Promise<AuthState> {
   const { data } = await supabase.auth.getSession();
   return { email: data.session?.user.email ?? null };
+}
+
+export async function getUserId(): Promise<string | null> {
+  const { data } = await supabase.auth.getSession();
+  return data.session?.user.id ?? null;
 }
 
 /** Current access token (refreshed if expired), or null when signed out. */
