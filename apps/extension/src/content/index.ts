@@ -47,8 +47,15 @@ function checkForVideoChange(): void {
 }
 
 function send(msg: ContentToBackground): void {
-  // Rejects if the extension was reloaded under a live tab ("context invalidated").
-  sendToBackground(msg).catch((err) => log("send failed", err));
+  // After the extension is reloaded, this copy of the script is orphaned in the
+  // tab: chrome.runtime.id goes away and sendMessage throws synchronously
+  // ("Extension context invalidated"). Go quiet; reloading the tab brings a fresh copy.
+  if (!chrome.runtime?.id) return stop();
+  try {
+    sendToBackground(msg).catch((err) => log("send failed", err));
+  } catch {
+    stop();
+  }
 }
 
 async function skip(videoId: string): Promise<void> {
@@ -82,19 +89,31 @@ chrome.runtime.onMessage.addListener((msg: BackgroundToContent) => {
  * captured at the document because the feed scrolls in an inner container,
  * and scroll events don't bubble.
  */
+let pending = false;
+let stopped = false;
+const observer = new MutationObserver(schedule);
+
+function schedule(): void {
+  if (pending || stopped) return;
+  pending = true;
+  window.setTimeout(() => {
+    pending = false;
+    if (!stopped) checkForVideoChange();
+  }, 150);
+}
+
 function start(): void {
-  let pending = false;
-  const schedule = () => {
-    if (pending) return;
-    pending = true;
-    window.setTimeout(() => {
-      pending = false;
-      checkForVideoChange();
-    }, 150);
-  };
-  new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true });
+  observer.observe(document.body, { childList: true, subtree: true });
   document.addEventListener("scroll", schedule, { passive: true, capture: true });
   schedule();
+}
+
+function stop(): void {
+  if (stopped) return;
+  stopped = true;
+  observer.disconnect();
+  document.removeEventListener("scroll", schedule, { capture: true });
+  log("extension was reloaded; refresh this tab to reconnect");
 }
 
 if (import.meta.env.VITE_HS_ENABLE_CONTENT === "true") start();
