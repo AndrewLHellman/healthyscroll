@@ -14,6 +14,8 @@ chrome.runtime.onMessage.addListener((msg: ContentToBackground, sender) => {
 
   switch (msg.type) {
     case "VIDEO_CHANGED":
+    case "VIDEO_CONTEXT_UPDATED":
+      // An update restarts the pipeline for the same video, now with comments.
       void getPolicy().then((policy) => onVideoChanged(tabId, windowId, msg.context, policy));
       break;
     case "VIDEO_ENDED":

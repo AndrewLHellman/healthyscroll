@@ -42,9 +42,10 @@ healthyscroll/
 ## Components and responsibilities
 
 ### Content script (`apps/extension/src/content`)
-- Detects when the video in view changes (MutationObserver + scroll, debounced).
-- Scrapes `VideoContext` (text only) and sends `VIDEO_CHANGED` to background.
-- On `SKIP_VIDEO`, advances the feed (clicks TikTok's next button / ArrowDown).
+- Detects when the video in view changes (MutationObserver + captured scroll, throttled). Stable `videoId` from the player wrapper id → permalink → URL → text fingerprint.
+- Scrapes `VideoContext` (text only) and sends `VIDEO_CHANGED` to background; sends `VIDEO_CONTEXT_UPDATED` once comments load.
+- Uses comments only if the user already has TikTok's comment panel open (they're only in the DOM then). Never opens it.
+- On `SKIP_VIDEO`, advances the feed: TikTok's next button, then scroll-into-view, then ArrowDown, checking after each that the video actually changed.
 - Knows nothing about models. `tiktok.ts` is the only file allowed to contain selectors.
 
 ### Background service worker (`apps/extension/src/background`)
@@ -92,7 +93,7 @@ What crosses the network boundary to our server: policy text, page text, Moondre
 
 Defined once in `apps/extension/src/lib/messages.ts`:
 
-- content → background: `VIDEO_CHANGED {context}`, `VIDEO_ENDED {videoId}`
+- content → background: `VIDEO_CHANGED {context}`, `VIDEO_CONTEXT_UPDATED {context}` (same video, comments arrived; restarts the pipeline), `VIDEO_ENDED {videoId}`
 - background → content: `SKIP_VIDEO {videoId, decision}`, `DECISION {decision}`
 
 `SKIP_VIDEO` carries the `videoId` so the content script can refuse to skip if the user already scrolled on.

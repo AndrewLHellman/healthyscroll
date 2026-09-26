@@ -9,6 +9,8 @@ import type { Decision, VideoContext } from "@healthyscroll/shared";
 /** content → background */
 export type ContentToBackground =
   | { type: "VIDEO_CHANGED"; context: VideoContext }
+  /** Same video, richer context (comments finished loading). Background re-runs the pipeline. */
+  | { type: "VIDEO_CONTEXT_UPDATED"; context: VideoContext }
   | { type: "VIDEO_ENDED"; videoId: string };
 
 /** background → content */

@@ -39,7 +39,7 @@ pnpm dev:extension      # builds to apps/extension/dist with HMR
 
 Load `apps/extension/dist` as an unpacked extension at `chrome://extensions`. For the visual stages, install and run [Moondream Station](https://moondream.ai/station) (serves on `localhost:2020`).
 
-The content-script observer is off by default while the pipeline is under construction. Set `VITE_HS_ENABLE_CONTENT=true` in `apps/extension/.env` to turn it on.
+The content-script observer is off by default while the pipeline is under construction. Set `VITE_HS_ENABLE_CONTENT=true` in `apps/extension/.env` to turn it on, and `VITE_HS_DEBUG=true` for console logging plus the `hs:probe` / `hs:skip` console hooks (see `apps/extension/src/content/index.ts`).
 
 ```bash
 pnpm typecheck          # all packages

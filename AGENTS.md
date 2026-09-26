@@ -33,7 +33,7 @@ Node >= 22.12 (`.nvmrc`). If corepack complains about a keyid, prefix with `CORE
 
 ## Current state
 
-Scaffold. Typechecks; not yet run against tiktok.com. The content script observer is gated behind `VITE_HS_ENABLE_CONTENT=true`. Do not drive a browser or load the extension unless asked — see `docs/ROADMAP.md` Phase 1 for the order of operations.
+TikTok adapter (scrape + skip) verified on the live For You page; the Jev/Moondream pipeline has not been run yet. The content script observer is gated behind `VITE_HS_ENABLE_CONTENT=true`; `VITE_HS_DEBUG=true` adds console logging and the `hs:probe` / `hs:skip` console hooks. Do not drive a browser or load the extension unless asked — see `docs/ROADMAP.md` Phase 1 for the order of operations.
 
 ## External APIs (verified 2026-09-25)
 
