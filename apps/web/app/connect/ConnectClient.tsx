@@ -10,6 +10,7 @@ import {
   SUPABASE_URL,
   type ConnectExtensionMessage,
 } from "@healthyscroll/shared";
+import { finishGoogleSignIn, startGoogleSignIn } from "@/lib/googleSignIn";
 
 /**
  * A second Supabase client, just for the extension's session (see
@@ -19,8 +20,7 @@ import {
  */
 const extensionAuth = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
-    flowType: "pkce",
-    detectSessionInUrl: true,
+    detectSessionInUrl: false,
     persistSession: true,
     autoRefreshToken: false,
     storageKey: EXTENSION_AUTH_STORAGE_KEY,
@@ -51,9 +51,14 @@ export function ConnectClient() {
     window.addEventListener("message", onMessage);
 
     let slowTimer: number | undefined;
-    // getSession waits for the ?code= exchange when we've just come back from Google.
-    void extensionAuth.auth.getSession().then(({ data }) => {
-      if (window.location.search.includes("code=")) window.history.replaceState(null, "", window.location.pathname);
+    void (async () => {
+      // Just back from Google: turn its #id_token into the extension's session first.
+      const finished = await finishGoogleSignIn(extensionAuth);
+      if (finished && !finished.ok) {
+        setState({ kind: "failed", error: finished.error });
+        return;
+      }
+      const { data } = await extensionAuth.auth.getSession();
       if (!data.session) {
         setState({ kind: "signed-out" });
         return;
@@ -64,7 +69,7 @@ export function ConnectClient() {
       ready();
       poke.current = window.setInterval(ready, 1000);
       slowTimer = window.setTimeout(() => setState((s) => (s.kind === "handing-off" ? { ...s, slow: true } : s)), 4000);
-    });
+    })();
 
     return () => {
       window.removeEventListener("message", onMessage);
@@ -74,10 +79,7 @@ export function ConnectClient() {
   }, []);
 
   function signIn() {
-    void extensionAuth.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: `${window.location.origin}/connect` },
-    });
+    void startGoogleSignIn("/connect");
   }
 
   return (

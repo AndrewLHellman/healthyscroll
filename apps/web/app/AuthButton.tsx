@@ -1,13 +1,11 @@
 "use client";
 
 import { supabase, useUser } from "@/lib/supabaseBrowser";
+import { startGoogleSignIn } from "@/lib/googleSignIn";
 
 /** Google sign-in always lands on the dashboard, wherever it was started. */
 export function signIn() {
-  void supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: { redirectTo: `${window.location.origin}/dashboard` },
-  });
+  void startGoogleSignIn("/dashboard");
 }
 
 /**

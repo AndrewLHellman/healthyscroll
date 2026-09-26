@@ -1,0 +1,22 @@
+# nginx site for the vision service, on the server at
+# /etc/nginx/sites-available/vision.healthyscroll.net (installed by hand, not
+# by the deploy job). Certbot adds the 443 block:
+#   certbot --nginx -d vision.healthyscroll.net
+server {
+    listen 80;
+    listen [::]:80;
+    server_name vision.healthyscroll.net;
+
+    client_max_body_size 4m;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        # Frame fetching + captioning can take a few seconds.
+        proxy_read_timeout 60s;
+    }
+}

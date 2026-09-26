@@ -1,7 +1,7 @@
 # Runs on the server at /srv/healthyscroll. The GitHub Actions deploy job
-# copies this file over, pulls the image it names, and restarts.
+# copies this file over, pulls the images it names, and restarts.
 # Secrets (AI_GATEWAY_API_KEY, ...) live in /srv/healthyscroll/.env on the
-# server, never in this file.
+# server, never in this file. Both services read the same .env.
 services:
   web:
     image: ghcr.io/andrewlhellman/healthyscroll-web:latest
@@ -9,3 +9,17 @@ services:
     env_file: .env
     ports:
       - "127.0.0.1:3001:3000"
+
+  # vision.healthyscroll.net (nginx in front). CPU box: SigLIP 2 scores, the
+  # gateway captions. One process on purpose: the per-Reel cache is in memory.
+  vision:
+    image: ghcr.io/andrewlhellman/healthyscroll-vision:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      VISION_MODEL: siglip2-base
+      VISION_CAPTIONER: gemini-3.5-flash-lite
+      VISION_QUANTIZE: "false"
+    ports:
+      - "127.0.0.1:8000:8000"
+    mem_limit: 3g
