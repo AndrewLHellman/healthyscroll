@@ -2,7 +2,7 @@
  * A faithful, static rendering of the extension popup.
  * Mirrors apps/extension/src/popup/Popup.tsx; if that changes, change this.
  */
-import { Mark } from "./Mark";
+import { MarkImage } from "./Mark";
 
 export function PopupMock() {
   return (
@@ -10,7 +10,7 @@ export function PopupMock() {
       {/* Browser toolbar fragment, so it reads as a popup and not a form. */}
       <div className="flex items-center justify-end gap-3 rounded-t-xl border border-b-0 border-line bg-mist px-3 py-2">
         <span className="h-2 w-24 rounded-full bg-line" aria-hidden />
-        <Mark height={14} className="text-ink" />
+        <MarkImage height={14} />
       </div>
 
       <div className="w-[320px] rounded-b-xl border border-line bg-paper p-5 shadow-[0_24px_60px_-24px_rgba(18,20,26,0.35)]">

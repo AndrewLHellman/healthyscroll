@@ -1,15 +1,22 @@
-import type { Category, SkipRow } from "@healthyscroll/shared";
+import type { Category } from "@healthyscroll/shared";
 
 /**
- * Rollups over the `skips` table for the dashboard. Pure; runs in the browser
- * so hours and days are in the user's local time.
+ * Rollups for the dashboard. Pure; runs in the browser so days are in the
+ * user's local time.
  *
- * Two figures: skips per day, stacked by what kind of video it was, and skips
- * by hour of day. Nothing about how the decision was made; that's pipeline
- * detail, not the user's.
+ * The unit is a Reel that came on screen. Some were skipped, the rest were
+ * watched for some number of seconds. From that: how much you scrolled, what
+ * got skipped, and how long you spent watching.
  */
 
-export type SkipLite = Pick<SkipRow, "skipped_at"> & { category?: Category | null };
+export interface ReelLite {
+  /** ISO timestamp of when the Reel came on screen. */
+  seen_at: string;
+  skipped: boolean;
+  /** Seconds it was on screen. Skipped Reels are on screen for about a second. */
+  seconds: number;
+  category?: Category | null;
+}
 
 /** Skips with no category (or beyond the top few) collapse into this. */
 export const REST = "other" as const;
@@ -18,8 +25,11 @@ export interface DayStat {
   /** Local YYYY-MM-DD. */
   date: string;
   ts: number;
-  total: number;
-  byCategory: Partial<Record<Category, number>>;
+  seen: number;
+  skipped: number;
+  /** Seconds spent on Reels that weren't skipped. */
+  seconds: number;
+  skippedByCategory: Partial<Record<Category, number>>;
 }
 
 export interface CategoryCount {
@@ -27,32 +37,24 @@ export interface CategoryCount {
   count: number;
 }
 
-export interface Peak {
-  /** Local hours, inclusive start, exclusive end (may wrap past 24). */
-  start: number;
-  end: number;
-  /** Share of all skips in the window that fell in these hours. */
-  share: number;
-}
-
 export interface Stats {
-  /** Skips inside the window. */
-  total: number;
+  seen: number;
+  skipped: number;
+  /** Seconds spent on Reels that weren't skipped. */
+  seconds: number;
   days: DayStat[];
   /** Most-skipped first. */
-  byCategory: CategoryCount[];
-  /** Count per local hour, 0–23. */
-  hours: number[];
-  /** Densest three-hour block, or null if there's too little to say. */
-  peak: Peak | null;
+  skippedByCategory: CategoryCount[];
+  /**
+   * False when only skips are known (nothing about the Reels that were
+   * watched). Figures that need the whole feed stay hidden.
+   */
+  tracked: boolean;
 }
 
 const DAY = 86_400_000;
-const PEAK_HOURS = 3;
-/** Below this many skips a "most of it lands between…" sentence is noise. */
-const PEAK_MIN = 8;
 
-export function computeStats(skips: SkipLite[], opts: { days?: number; now?: number } = {}): Stats {
+export function computeStats(reels: ReelLite[], opts: { days?: number; now?: number } = {}): Stats {
   const now = opts.now ?? Date.now();
   const dayCount = opts.days ?? 28;
   const since = startOfDay(now) - (dayCount - 1) * DAY;
@@ -60,47 +62,41 @@ export function computeStats(skips: SkipLite[], opts: { days?: number; now?: num
   const days: DayStat[] = [];
   for (let i = dayCount - 1; i >= 0; i--) {
     const ts = startOfDay(now - i * DAY);
-    days.push({ date: dayKey(ts), ts, total: 0, byCategory: {} });
+    days.push({ date: dayKey(ts), ts, seen: 0, skipped: 0, seconds: 0, skippedByCategory: {} });
   }
   const byDate = new Map(days.map((d) => [d.date, d]));
 
-  const hours = new Array<number>(24).fill(0);
   const cats = new Map<Category, number>();
-  let total = 0;
+  let seen = 0;
+  let skipped = 0;
+  let seconds = 0;
+  let watched = 0;
 
-  for (const s of skips) {
-    const t = new Date(s.skipped_at).getTime();
+  for (const r of reels) {
+    const t = new Date(r.seen_at).getTime();
     if (!Number.isFinite(t) || t < since || t > now + DAY) continue;
     const d = byDate.get(dayKey(t));
     if (!d) continue;
-    const cat = s.category ?? REST;
-    d.total += 1;
-    d.byCategory[cat] = (d.byCategory[cat] ?? 0) + 1;
-    cats.set(cat, (cats.get(cat) ?? 0) + 1);
-    hours[new Date(t).getHours()] += 1;
-    total += 1;
+    d.seen += 1;
+    seen += 1;
+    if (r.skipped) {
+      const cat = r.category ?? REST;
+      d.skipped += 1;
+      d.skippedByCategory[cat] = (d.skippedByCategory[cat] ?? 0) + 1;
+      cats.set(cat, (cats.get(cat) ?? 0) + 1);
+      skipped += 1;
+    } else {
+      d.seconds += r.seconds;
+      seconds += r.seconds;
+      watched += 1;
+    }
   }
 
-  const byCategory = [...cats.entries()]
+  const skippedByCategory = [...cats.entries()]
     .map(([category, count]) => ({ category, count }))
     .sort((a, b) => b.count - a.count || (a.category === REST ? 1 : b.category === REST ? -1 : 0));
 
-  return { total, days, byCategory, hours, peak: peakOf(hours, total) };
-}
-
-function peakOf(hours: number[], total: number): Peak | null {
-  if (total < PEAK_MIN) return null;
-  let best = -1;
-  let start = 0;
-  for (let h = 0; h < 24; h++) {
-    let sum = 0;
-    for (let k = 0; k < PEAK_HOURS; k++) sum += hours[(h + k) % 24];
-    if (sum > best) {
-      best = sum;
-      start = h;
-    }
-  }
-  return { start, end: start + PEAK_HOURS, share: best / total };
+  return { seen, skipped, seconds, days, skippedByCategory, tracked: watched > 0 };
 }
 
 /* ------------------------------------------------------------ formatting */
@@ -119,18 +115,18 @@ export function longDate(ts: number): string {
   return `${WEEKDAY[new Date(ts).getDay()]} ${shortDate(ts)}`;
 }
 
-/** 0 → "12 am", 13 → "1 pm". Hours ≥ 24 wrap. */
-export function hourLabel(h: number): string {
-  const x = ((h % 24) + 24) % 24;
-  const n = x % 12 === 0 ? 12 : x % 12;
-  return `${n} ${x < 12 ? "am" : "pm"}`;
+/** "Tue" */
+export function weekday(ts: number): string {
+  return WEEKDAY[new Date(ts).getDay()];
 }
 
-/** Compact axis tick: 0 → "12a", 18 → "6p". */
-export function hourTick(h: number): string {
-  const x = h % 24;
-  const n = x % 12 === 0 ? 12 : x % 12;
-  return `${n}${x < 12 ? "a" : "p"}`;
+/** Fits above a narrow column: 5400 → "1.5h", 1500 → "25m", 0 → "–". */
+export function compactDuration(sec: number): string {
+  if (sec < 30) return "–";
+  const m = Math.round(sec / 60);
+  if (m < 60) return `${Math.max(m, 1)}m`;
+  const h = sec / 3600;
+  return `${h >= 10 ? Math.round(h) : h.toFixed(1).replace(/\.0$/, "")}h`;
 }
 
 export function pct(x: number): string {

@@ -1,4 +1,4 @@
-import { Mark } from "./Mark";
+import { MarkImage } from "./Mark";
 
 /**
  * Three steps, one phone screen each. The numbers are a real sequence, so
@@ -97,7 +97,7 @@ function InstallScreen() {
       <p className="mt-4 text-center text-sm font-semibold">Extensions</p>
       <div className="mt-4 rounded-xl border border-line">
         <div className="flex items-center gap-3 px-3 py-2.5">
-          <Mark height={20} className="text-ink" />
+          <MarkImage height={20} />
           <span className="flex-1 text-sm">Healthy Scroll</span>
           <Toggle on />
         </div>
@@ -119,7 +119,7 @@ function PromptScreen() {
     <Screen>
       <div className="mt-4 flex items-center justify-between">
         <span className="flex items-center gap-2 text-sm font-semibold">
-          <Mark height={16} className="text-ink" /> Healthy Scroll
+          <MarkImage height={16} /> Healthy Scroll
         </span>
         <span className="text-xs text-muted">On</span>
       </div>

@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Healthy Scroll — Chrome extension that skips short-form videos not aligned with a user-written policy. Read `docs/OVERVIEW.md` first, then `docs/ARCHITECTURE.md` and `docs/DECISION_PIPELINE.md`. Those are the source of truth for intent; this file is just operating notes.
+Healthy Scroll — a Safari extension for iPhone that skips Instagram Reels (on `instagram.com` in Safari, not the app) that don't match a policy the user wrote in plain English. TikTok in Chrome is the secondary target; YouTube Shorts is later. Read `docs/OVERVIEW.md` first, then `docs/ARCHITECTURE.md` and `docs/DECISION_PIPELINE.md`. The landing page (`apps/web/app/page.tsx`, especially the FAQ) is the current source of truth for product intent; the docs still describe the Chrome/TikTok build and are being brought in line. This file is just operating notes.
 
 ## Commands
 
@@ -16,24 +16,23 @@ Node >= 22.12 (`.nvmrc`). If corepack complains about a keyid, prefix with `CORE
 
 ## Layout
 
-- `apps/extension` — MV3 extension. `background/` is the brain (pipeline), `content/` is eyes and hands only (scrape + skip), `popup/` is one toggle + one textarea.
-- `apps/web` — Next.js 16 landing + `app/api/evaluate/route.ts` (the only backend; calls Jev).
-- `apps/vision` — Python/FastAPI `POST /analyze`: pulls ~3 frames from a Reel's DASH manifest or video URL with ffmpeg (range requests, no full download) and scores them against the policy with a VLM. Model is `VISION_MODEL`; `bench/` compares models on labeled clips using the same code. See `apps/vision/README.md`.
+- `apps/extension` — MV3 web extension (Vite/CRXJS). Ships as a Safari Web Extension on iOS and loads unpacked in Chrome for development. `background/` is the brain (pipeline), `content/` is eyes and hands only (scrape + skip), `popup/` is one toggle + one textarea, `insights/` is the on-device "your week" page.
+- `apps/web` — Next.js 16 landing + dashboard + `app/api/evaluate/route.ts` (the only backend; calls Jev, and Moondream when a frame is needed).
 - `packages/shared` — types, Jev question schema, thresholds. Consumed as raw TS by both apps.
 
 ## Rules of the codebase
 
-- **All TikTok DOM knowledge lives in `apps/extension/src/content/tiktok.ts`.** Nowhere else. Prefer `data-e2e` selectors.
-- **Instagram Reels:** DOM knowledge (active Reel, skip) lives only in `content/instagram.ts`. Reel media (DASH manifest, poster, caption) comes from Instagram's API responses via the main-world hook `public/instagram-hook.js` (plain JS, appended to the built manifest by `vite.config.ts`; it can't import anything). Judgement is `background/reels.ts`: Jev text + vision `/analyze` in parallel for every Reel as it loads (prefetch), caption → Jev when vision is uncertain, one skip per Reel.
+- **All platform DOM knowledge lives in one adapter per site under `apps/extension/src/content/`** (`instagram.ts` for Reels, `tiktok.ts` for TikTok). Nowhere else. Adapters share the `VideoContext` shape; the rest of the extension must not know which site it is on. Prefer stable hooks (`data-e2e` on TikTok, `aria-label`/roles on Instagram) over class names.
 - **The content script never makes decisions.** It reports `VIDEO_CHANGED` and executes `SKIP_VIDEO`. Judgement is in `background/orchestrator.ts`.
 - **The extension never holds the AI Gateway key.** Jev is only called from `apps/web/lib/jev.ts`.
-- **Auth is Supabase + Google, run from the background worker** (`background/auth.ts`, session in `chrome.storage.local`). The API verifies the bearer token in `apps/web/lib/supabase.ts`. Extension ID is pinned by `key` in the manifest; the private key is `apps/extension/key.pem` (gitignored).
+- **Auth is Supabase + Google, run from the background worker** (`background/auth.ts`, session in `chrome.storage.local`). Sign-in is optional: without it the prompt lives only on the device and `/api/evaluate` still works. The API verifies the bearer token in `apps/web/lib/supabase.ts`. Chrome extension ID is pinned by `key` in the manifest; the private key is `apps/extension/key.pem` (gitignored). Safari uses its own bundle ID; the OAuth redirect must be registered for both.
 - **Database is Supabase Postgres with RLS** (`supabase/migrations/`). Tables: `policies` (one row per user) and `skips`. The extension syncs in `background/sync.ts` only; DB calls are best-effort and must never block or trigger a skip.
-- **The extension never uploads the user's screen.** Visual analysis runs server-side in `apps/vision` on the Reel's own (public CDN) video, fetched from the manifest/URL the extension sends. No screenshots, no `captureVisibleTab` output, leaves the device. (Moving to Instagram Reels on iOS Safari; the TikTok/Moondream-Station path is legacy.)
-- **Never skip on error.** If Jev/Moondream/API fails, log and leave the video alone.
+- **Frames are described, then discarded. Never stored.** The extension sends text only (caption, comments, the user's prompt). When Jev is unsure, the *server* fetches one frame, has Moondream describe it in a sentence, and drops the bytes; only the sentence is kept for the second Jev call. The dwell tally ("your week") never leaves the phone. There is no local Moondream Station on iPhone; `background/moondreamClient.ts` → `localhost:2020` is the Chrome-dev-only path and is going away.
+- **Never skip on error.** If Jev/Moondream/API fails, log and leave the Reel alone. Only confident matches (`THRESHOLDS.skip`) skip; the middle band gets a second look, never a guess.
 - Cross-context message types are defined once in `apps/extension/src/lib/messages.ts`.
 - Anything shared between extension and web (types, Jev schema, thresholds) goes in `packages/shared`.
-- UI is minimal by design. Don't add settings, stats, or onboarding without being asked.
+- **Safari on iOS is the constraint.** No `chrome.tabs.captureVisibleTab`, no `localhost`, service worker can be killed anytime. Anything that only works in desktop Chrome is dev tooling, not product.
+- UI is minimal by design. Don't add settings, stats, or onboarding without being asked. The popup is one toggle, one text box, one line about today.
 
 ## Deploy
 
@@ -41,9 +40,16 @@ Pushing to `main` builds `apps/web/Dockerfile`, pushes it to `ghcr.io/andrewlhel
 
 ## Current state
 
-TikTok adapter (scrape + skip) verified on the live For You page; the Jev/Moondream pipeline has not been run yet. The content script observer is gated behind `VITE_HS_ENABLE_CONTENT=true`; `VITE_HS_DEBUG=true` adds console logging and the `hs:probe` / `hs:skip` console hooks. Do not drive a browser or load the extension unless asked — see `docs/ROADMAP.md` Phase 1 for the order of operations.
+The landing page and marketing are ahead of the code. As of 2026-09-26:
+
+- Only `content/tiktok.ts` exists; `content/instagram.ts` (Reels on `instagram.com`) has not been written, and `manifest.config.ts` still matches `tiktok.com` only.
+- The Safari Web Extension wrapper (Xcode project) does not exist yet; the extension is built and loaded unpacked in Chrome.
+- Moondream is still called from the extension against `localhost:2020`; the server-side describe step in `/api/evaluate` has not been built.
+- TikTok adapter (scrape + skip) is verified on the live For You page; the Jev pipeline has not been run end to end.
+
+The content script observer is gated behind `VITE_HS_ENABLE_CONTENT=true`; `VITE_HS_DEBUG=true` adds console logging and the `hs:probe` / `hs:skip` console hooks. Do not drive a browser or load the extension unless asked — see `docs/ROADMAP.md` for the order of operations.
 
 ## External APIs (verified 2026-09-25)
 
 - Jev: `experimental_evaluate({ model: "typesafe-ai/jev", state, questions })` from `ai@7`. Boolean answers → `result.answers.<q>.probability`. Details in `docs/JEV.md`.
-- Moondream Station REST: `POST http://localhost:2020/v1/caption|query` with `{ image_url: <data URL> }`. Details in `docs/MOONDREAM.md`.
+- Moondream REST: `POST /v1/caption|query` with `{ image_url: <data URL> }`. Verified against Moondream Station on `localhost:2020`; the same shape is used server-side (Moondream Cloud or a Station next to the web container). Details in `docs/MOONDREAM.md`.

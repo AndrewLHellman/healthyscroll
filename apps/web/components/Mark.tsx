@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 /**
  * The mark: a pixel phone showing a feed of three cards, and the one worth
  * keeping is a heart. The heart is the classic 9 × 8 pixel heart at 1 unit
@@ -8,6 +10,18 @@
  */
 export const MARK_COLS = 19;
 export const MARK_ROWS = 28;
+
+/**
+ * The mark as a bitmap, for the site itself. `public/mark.png` is the SVG
+ * below rendered at 60 px per cell (from `/graphics/mark`), so it downsamples
+ * the same way on every device instead of snapping cells to whatever the
+ * pixel grid happens to be. Regenerate with `scripts/shoot-graphics.sh`, then
+ * `magick public/graphics/mark.png -trim +repage -transparent white public/mark.png`.
+ */
+export function MarkImage({ height = 28, className = "" }: { height?: number; className?: string }) {
+  const width = Math.round((height * MARK_COLS) / MARK_ROWS);
+  return <Image src="/mark.png" width={width} height={height} alt="" aria-hidden className={className} priority />;
+}
 
 /** The classic 9 × 8 pixel heart. Also used on its own for bullets. */
 const HEART = [
