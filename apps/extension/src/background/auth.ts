@@ -1,6 +1,7 @@
 import { createClient, type SupportedStorage } from "@supabase/supabase-js";
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from "@healthyscroll/shared";
 import type { AuthState } from "../lib/messages";
+import { API_BASE_URL } from "../lib/config";
 
 /**
  * Supabase auth for the extension. Only the background worker uses this client:
@@ -29,11 +30,18 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 });
 
 /**
- * Google sign-in via Supabase. launchWebAuthFlow opens the Supabase → Google
+ * Google sign-in via Supabase. On Chrome, launchWebAuthFlow opens the Supabase → Google
  * page and resolves once it redirects to https://<extension-id>.chromiumapp.org/,
  * which must be in Supabase's Redirect URLs allow list.
  */
 export async function signIn(): Promise<AuthState> {
+  // Safari has no chrome.identity: sign in on the website, which hands the
+  // session back through content/connect.ts (AUTH_HANDOFF -> adoptSession).
+  if (import.meta.env.VITE_HS_TARGET === "safari") {
+    await chrome.tabs.create({ url: `${API_BASE_URL}/connect` });
+    return getAuthState();
+  }
+
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: { redirectTo: chrome.identity.getRedirectURL(), skipBrowserRedirect: true },
@@ -49,6 +57,13 @@ export async function signIn(): Promise<AuthState> {
 
   const exchanged = await supabase.auth.exchangeCodeForSession(code);
   if (exchanged.error) throw exchanged.error;
+  return getAuthState();
+}
+
+/** Adopt a session signed in on healthyscroll.net/connect (Safari). The extension owns it from here. */
+export async function adoptSession(accessToken: string, refreshToken: string): Promise<AuthState> {
+  const { error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+  if (error) throw error;
   return getAuthState();
 }
 

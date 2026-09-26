@@ -7,7 +7,7 @@ import type {
 import { getPolicy } from "./policyStore";
 import { cancel, onVideoChanged } from "./orchestrator";
 import { forgetTab, onReelActive, onReelsDiscovered } from "./reels";
-import { getAuthState, signIn, signOut } from "./auth";
+import { adoptSession, getAuthState, signIn, signOut } from "./auth";
 import { maybePullPolicy, pullPolicy, startPolicySync } from "./sync";
 
 /**
@@ -36,6 +36,11 @@ function handleAuth(msg: PopupToBackground): Promise<AuthState> {
       });
     case "AUTH_SIGN_OUT":
       return signOut().then(getAuthState);
+    case "AUTH_HANDOFF":
+      return adoptSession(msg.accessToken, msg.refreshToken).then(async (auth) => {
+        await pullQuietly();
+        return auth;
+      });
   }
 }
 

@@ -12,6 +12,9 @@ const target: Target = process.env.HS_TARGET === "safari" ? "safari" : "chrome";
 const outDir = resolve(__dirname, target === "chrome" ? "dist" : "dist-safari");
 const define = { "import.meta.env.VITE_HS_TARGET": JSON.stringify(target) };
 const INSTAGRAM = ["https://www.instagram.com/*"];
+// No port on localhost: match patterns can't have one (Safari ignores the entry), and
+// without one they match every port, so this covers dev:web on :3000.
+const CONNECT = ["https://healthyscroll.net/connect*", "http://localhost/connect*"];
 
 export default defineConfig(({ mode }) => ({
   plugins: [
@@ -47,6 +50,8 @@ export default defineConfig(({ mode }) => ({
  *   - Instagram isolated-world script (src/content/instagramMain.ts) ->
  *     assets/instagram.js. CRXJS's loader does a dynamic import() of a
  *     web-accessible chunk, which fails ("Importing a module script failed").
+ *   - Sign-in handoff on healthyscroll.net/connect (src/content/connect.ts) ->
+ *     assets/connect.js.
  *
  * Both targets — the Instagram main-world hook (public/instagram-hook.js, as-is).
  * It can't go through manifest.config.ts: CRXJS would bundle it behind the same
@@ -93,6 +98,9 @@ function postBuildScripts(mode: string): Plugin {
         background = { scripts: ["assets/background.js"], persistent: false };
         await buildClassic("content/instagramMain.ts", "assets/instagram.js");
         scripts.push({ matches: INSTAGRAM, js: ["assets/instagram.js"], run_at: "document_start" });
+        // Sign-in handoff from healthyscroll.net/connect (Safari has no chrome.identity).
+        await buildClassic("content/connect.ts", "assets/connect.js");
+        scripts.push({ matches: CONNECT, js: ["assets/connect.js"], run_at: "document_idle" });
       }
 
       let hook = "instagram-hook.js";

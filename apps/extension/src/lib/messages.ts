@@ -53,7 +53,9 @@ export type BackgroundToContent =
 export type PopupToBackground =
   | { type: "AUTH_GET" }
   | { type: "AUTH_SIGN_IN" }
-  | { type: "AUTH_SIGN_OUT" };
+  | { type: "AUTH_SIGN_OUT" }
+  /** From content/connect.ts on healthyscroll.net/connect: Safari's sign-in (it has no chrome.identity). */
+  | { type: "AUTH_HANDOFF"; accessToken: string; refreshToken: string };
 
 export type AuthState = { email: string | null };
 export type AuthResponse = { ok: true; auth: AuthState } | { ok: false; error: string };

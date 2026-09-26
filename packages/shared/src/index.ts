@@ -5,3 +5,4 @@ export * from "./thresholds";
 export * from "./insights";
 export * from "./supabase";
 export * from "./vision";
+export * from "./connect";

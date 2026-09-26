@@ -13,6 +13,9 @@ import { defineManifest } from "@crxjs/vite-plugin";
  */
 export type Target = "chrome" | "safari";
 
+// Supabase auth (session exchange + token refresh).
+const SUPABASE_HOST = "https://ikwvesahfsjpwdnwdfos.supabase.co/*";
+
 const HOSTS = [
   // Vision service (apps/vision): local dev, and its prod home once deployed.
   "http://localhost:8000/*",
@@ -20,8 +23,7 @@ const HOSTS = [
   // Our decision API (Jev lives behind it).
   "https://healthyscroll.net/*",
   "http://localhost:3000/*",
-  // Supabase auth (session exchange + token refresh).
-  "https://ikwvesahfsjpwdnwdfos.supabase.co/*",
+  SUPABASE_HOST,
 ];
 
 export default function manifestFor(target: Target) {
@@ -86,6 +88,14 @@ export default function manifestFor(target: Target) {
             "http://localhost:2020/*",
             ...HOSTS,
           ]
-        : ["https://www.instagram.com/*", ...HOSTS],
+        : [
+            "https://www.instagram.com/*",
+            "https://vision.healthyscroll.net/*",
+            "https://healthyscroll.net/*",
+            // Local dev:web and vision. Safari rejects ports in match patterns;
+            // without one this matches every port.
+            "http://localhost/*",
+            SUPABASE_HOST,
+          ],
   });
 }
