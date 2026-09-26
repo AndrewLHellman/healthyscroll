@@ -4,3 +4,4 @@ export * from "./questions";
 export * from "./thresholds";
 export * from "./insights";
 export * from "./supabase";
+export * from "./vision";

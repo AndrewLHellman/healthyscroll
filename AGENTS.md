@@ -18,16 +18,18 @@ Node >= 22.12 (`.nvmrc`). If corepack complains about a keyid, prefix with `CORE
 
 - `apps/extension` — MV3 extension. `background/` is the brain (pipeline), `content/` is eyes and hands only (scrape + skip), `popup/` is one toggle + one textarea.
 - `apps/web` — Next.js 16 landing + `app/api/evaluate/route.ts` (the only backend; calls Jev).
+- `apps/vision` — Python/FastAPI `POST /analyze`: pulls ~3 frames from a Reel's DASH manifest or video URL with ffmpeg (range requests, no full download) and scores them against the policy with a VLM. Model is `VISION_MODEL`; `bench/` compares models on labeled clips using the same code. See `apps/vision/README.md`.
 - `packages/shared` — types, Jev question schema, thresholds. Consumed as raw TS by both apps.
 
 ## Rules of the codebase
 
 - **All TikTok DOM knowledge lives in `apps/extension/src/content/tiktok.ts`.** Nowhere else. Prefer `data-e2e` selectors.
+- **Instagram Reels:** DOM knowledge (active Reel, skip) lives only in `content/instagram.ts`. Reel media (DASH manifest, poster, caption) comes from Instagram's API responses via the main-world hook `public/instagram-hook.js` (plain JS, appended to the built manifest by `vite.config.ts`; it can't import anything). Judgement is `background/reels.ts`: Jev text + vision `/analyze` in parallel for every Reel as it loads (prefetch), caption → Jev when vision is uncertain, one skip per Reel.
 - **The content script never makes decisions.** It reports `VIDEO_CHANGED` and executes `SKIP_VIDEO`. Judgement is in `background/orchestrator.ts`.
 - **The extension never holds the AI Gateway key.** Jev is only called from `apps/web/lib/jev.ts`.
 - **Auth is Supabase + Google, run from the background worker** (`background/auth.ts`, session in `chrome.storage.local`). The API verifies the bearer token in `apps/web/lib/supabase.ts`. Extension ID is pinned by `key` in the manifest; the private key is `apps/extension/key.pem` (gitignored).
 - **Database is Supabase Postgres with RLS** (`supabase/migrations/`). Tables: `policies` (one row per user) and `skips`. The extension syncs in `background/sync.ts` only; DB calls are best-effort and must never block or trigger a skip.
-- **Image bytes never leave the device.** Frames go to Moondream Station on `localhost:2020` only. Only text (metadata + captions) goes to our API.
+- **The extension never uploads the user's screen.** Visual analysis runs server-side in `apps/vision` on the Reel's own (public CDN) video, fetched from the manifest/URL the extension sends. No screenshots, no `captureVisibleTab` output, leaves the device. (Moving to Instagram Reels on iOS Safari; the TikTok/Moondream-Station path is legacy.)
 - **Never skip on error.** If Jev/Moondream/API fails, log and leave the video alone.
 - Cross-context message types are defined once in `apps/extension/src/lib/messages.ts`.
 - Anything shared between extension and web (types, Jev schema, thresholds) goes in `packages/shared`.

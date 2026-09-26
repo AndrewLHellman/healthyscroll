@@ -23,6 +23,9 @@ import {
  *
  * https://vercel.com/kb/guide/typesafe-jev-and-ai-sdk
  */
+const JEV_TIMEOUT_MS = Number(process.env.JEV_TIMEOUT_MS || 4000);
+const ZERO_DATA_RETENTION = process.env.JEV_ZERO_DATA_RETENTION !== "false";
+
 export async function decide(req: EvaluateRequest, stage: Decision["stage"]): Promise<Decision> {
   const started = Date.now();
 
@@ -30,9 +33,16 @@ export async function decide(req: EvaluateRequest, stage: Decision["stage"]): Pr
     model: JEV_MODEL,
     state: buildJevState(req),
     questions: jevQuestions,
+    // A late answer is useless: the viewer has scrolled past. Fail fast and let
+    // the extension fall back (it never skips on error) instead of the SDK's
+    // default retries, which took 50-60 s when the provider was busy.
+    maxRetries: 1,
+    abortSignal: AbortSignal.timeout(JEV_TIMEOUT_MS),
     providerOptions: {
       // We're processing what people watch; don't let it be retained anywhere.
-      gateway: { zeroDataRetention: true },
+      // Note: with ZDR on, the gateway can only route Jev to typesafe-ai (other
+      // providers are "zdr_ineligible"), which returned 429s under load on 2026-09-26.
+      gateway: { zeroDataRetention: ZERO_DATA_RETENTION },
     },
   });
 

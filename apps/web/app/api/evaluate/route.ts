@@ -26,7 +26,7 @@ const bodySchema = z.object({
   policy: z.object({ prompt: z.string().max(2000) }),
   context: z.object({
     videoId: z.string(),
-    platform: z.literal("tiktok"),
+    platform: z.enum(["tiktok", "instagram"]),
     url: z.string(),
     author: z.string().optional(),
     description: z.string().optional(),

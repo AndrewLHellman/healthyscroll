@@ -6,6 +6,7 @@ import type {
 } from "../lib/messages";
 import { getPolicy } from "./policyStore";
 import { cancel, onVideoChanged } from "./orchestrator";
+import { forgetTab, onReelActive, onReelsDiscovered } from "./reels";
 import { getAuthState, signIn, signOut } from "./auth";
 import { maybePullPolicy, pullPolicy, startPolicySync } from "./sync";
 
@@ -66,7 +67,18 @@ chrome.runtime.onMessage.addListener((msg: ContentToBackground | PopupToBackgrou
     case "VIDEO_ENDED":
       cancel(tabId);
       break;
+    // Instagram Reels: judged on discovery (prefetch), acted on when active.
+    case "REELS_DISCOVERED":
+      maybePullPolicy();
+      void getPolicy().then((policy) => onReelsDiscovered(tabId, msg.reels, policy));
+      break;
+    case "REEL_ACTIVE":
+      void getPolicy().then((policy) => onReelActive(tabId, msg.code, policy));
+      break;
   }
 });
 
-chrome.tabs.onRemoved.addListener((tabId) => cancel(tabId));
+chrome.tabs.onRemoved.addListener((tabId) => {
+  cancel(tabId);
+  forgetTab(tabId);
+});

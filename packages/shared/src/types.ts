@@ -17,9 +17,9 @@ export interface UserPolicy {
 
 /** Everything the content script can read off the page about the current video, no vision needed. */
 export interface VideoContext {
-  /** Stable id for the video (TikTok video id from URL or DOM). */
+  /** Stable id for the video (TikTok video id / Instagram media pk). */
   videoId: string;
-  platform: "tiktok";
+  platform: "tiktok" | "instagram";
   url: string;
   author?: string;
   description?: string;
