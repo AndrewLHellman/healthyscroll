@@ -5,10 +5,10 @@ import { useSearchParams } from "next/navigation";
 import type { PolicyRow, SkipRow } from "@healthyscroll/shared";
 import { supabase, useUser } from "@/lib/supabaseBrowser";
 import { signIn } from "@/app/AuthButton";
-import { Mark } from "@/components/Mark";
-import { SkipStats } from "./SkipStats";
-import { computeStats, longDate, type SkipLite } from "./stats";
-import { buildSampleSkips, SAMPLE_ALL_TIME, SAMPLE_PROMPT } from "./sample";
+import { MarkImage } from "@/components/Mark";
+import { FeedStats } from "./FeedStats";
+import { computeStats, longDate, type ReelLite } from "./stats";
+import { buildSampleReels, SAMPLE_ALL_TIME, SAMPLE_PROMPT } from "./sample";
 
 const WINDOW_DAYS = 28;
 const PLACEHOLDER = "e.g. gambling, drinking, thirst-trap content, anything that makes me feel worse about myself";
@@ -39,7 +39,7 @@ function Shell() {
 function SignedOut() {
   return (
     <div className="mx-auto flex min-h-[60vh] max-w-md flex-col items-start justify-center gap-6 py-20">
-      <Mark height={40} className="text-ink" />
+      <MarkImage height={40} />
       <div>
         <h1 className="font-display text-3xl font-semibold tracking-tight">Your dashboard</h1>
         <p className="mt-3 text-lg leading-relaxed text-muted">
@@ -62,12 +62,12 @@ function SignedOut() {
 }
 
 function SampleDashboard({ empty }: { empty: boolean }) {
-  const skips = useMemo(() => (empty ? [] : buildSampleSkips()), [empty]);
+  const reels = useMemo(() => (empty ? [] : buildSampleReels()), [empty]);
   return (
     <Dashboard
       prompt={empty ? "" : SAMPLE_PROMPT}
       updatedAt={empty ? null : new Date(Date.now() - 9 * 86_400_000).toISOString()}
-      skips={skips}
+      reels={reels}
       allTime={empty ? 0 : SAMPLE_ALL_TIME}
       readOnly
     />
@@ -76,7 +76,7 @@ function SampleDashboard({ empty }: { empty: boolean }) {
 
 function LiveDashboard({ userId }: { userId: string }) {
   const [policy, setPolicy] = useState<Pick<PolicyRow, "prompt" | "updated_at"> | null | undefined>(undefined);
-  const [skips, setSkips] = useState<SkipLite[] | undefined>(undefined);
+  const [reels, setReels] = useState<ReelLite[] | undefined>(undefined);
   const [allTime, setAllTime] = useState<number | null>(null);
 
   useEffect(() => {
@@ -94,21 +94,23 @@ function LiveDashboard({ userId }: { userId: string }) {
       .order("skipped_at", { ascending: false })
       .limit(5000)
       .returns<Pick<SkipRow, "skipped_at">[]>()
-      .then(({ data }) => setSkips(data ?? []));
+      // Only skips are recorded server-side, so the feed is known one-sided
+      // for now; the figures that need watched Reels stay hidden.
+      .then(({ data }) => setReels((data ?? []).map((s) => ({ seen_at: s.skipped_at, skipped: true, seconds: 0 }))));
     void supabase
       .from("skips")
       .select("*", { count: "exact", head: true })
       .then(({ count, error }) => setAllTime(error ? null : (count ?? 0)));
   }, [userId]);
 
-  if (policy === undefined || skips === undefined) return <Shell />;
+  if (policy === undefined || reels === undefined) return <Shell />;
 
   return (
     <Dashboard
       userId={userId}
       prompt={policy?.prompt ?? ""}
       updatedAt={policy?.updated_at ?? null}
-      skips={skips}
+      reels={reels}
       allTime={allTime}
     />
   );
@@ -120,18 +122,18 @@ function Dashboard({
   userId,
   prompt,
   updatedAt,
-  skips,
+  reels,
   allTime,
   readOnly = false,
 }: {
   userId?: string;
   prompt: string;
   updatedAt: string | null;
-  skips: SkipLite[];
+  reels: ReelLite[];
   allTime: number | null;
   readOnly?: boolean;
 }) {
-  const stats = useMemo(() => computeStats(skips, { days: WINDOW_DAYS }), [skips]);
+  const stats = useMemo(() => computeStats(reels, { days: WINDOW_DAYS }), [reels]);
 
   return (
     <div className="flex flex-col">
@@ -163,14 +165,15 @@ function Dashboard({
         </div>
       </section>
 
-      <section aria-labelledby="skips-heading" className="border-t border-line pt-14">
+      <section aria-labelledby="feed-heading" className="border-t border-line pt-14">
         <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
-          <h2 id="skips-heading" className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">
-            Skipped
+          <h2 id="feed-heading" className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">
+            Last four weeks
           </h2>
+          {!!allTime && <p className="font-mono text-[11px] text-faint">{allTime.toLocaleString()} skipped all time</p>}
         </div>
         <div className="mt-10">
-          <SkipStats stats={stats} allTime={allTime} />
+          <FeedStats stats={stats} allTime={allTime} />
         </div>
       </section>
     </div>
