@@ -51,7 +51,7 @@ Xcode 27. Open `apps/ios/Healthy Scroll/Healthy Scroll.xcodeproj`, scheme **Heal
 
 ## Deploy
 
-Pushing to `main` builds `apps/web/Dockerfile` and `apps/vision/Dockerfile`, pushes them to `ghcr.io/andrewlhellman/healthyscroll-{web,vision}`, and restarts both on the server via `deploy/docker-compose.yml` (`.github/workflows/deploy.yml`). On the server: `/srv/healthyscroll/{docker-compose.yml,.env}`; web on `127.0.0.1:3001` behind nginx site `healthyscroll.net`, vision on `127.0.0.1:8000` behind `vision.healthyscroll.net` (`deploy/nginx/`, installed by hand). Secrets go in the server's `.env`, never in the repo. The server has no GPU: vision runs SigLIP 2 on CPU and captions through the AI Gateway (`VISION_CAPTIONER=gemini-3.5-flash-lite`, set in the compose file).
+Pushing to `main` builds `apps/web/Dockerfile` and `apps/vision/Dockerfile`, pushes them to `ghcr.io/andrewlhellman/healthyscroll-{web,vision}`, and restarts both on the server via `deploy/docker-compose.yml` (`.github/workflows/deploy.yml`). On the server: `/srv/healthyscroll/{docker-compose.yml,.env}`; web on `127.0.0.1:3001` behind nginx site `healthyscroll.net`, vision on `127.0.0.1:8000` behind `vision.healthyscroll.net` (`deploy/nginx/`, installed by hand). Secrets go in the server's `.env`, never in the repo. The server has no GPU: vision runs SigLIP 2 on CPU and captions through the AI Gateway (`VISION_CAPTIONER=gemini-2.5-flash-lite`; the gateway account is free tier, which blocks the 3.x Flash-Lite models, set in the compose file).
 
 ## Current state
 

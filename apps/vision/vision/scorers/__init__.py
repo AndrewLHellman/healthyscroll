@@ -44,6 +44,9 @@ REGISTRY: dict[str, Spec] = {
     "siglip2-base": Spec("siglip", "google/siglip2-base-patch16-224", skip=0.025, allow=0.0015),
     "gemini-3.5-flash-lite": Spec("gateway", "google/gemini-3.5-flash-lite"),
     "gemini-3.1-flash-lite": Spec("gateway", "google/gemini-3.1-flash-lite"),
+    # The only Flash-Lite the gateway's free tier allows (3.x return 403); what
+    # the deploy server captions with.
+    "gemini-2.5-flash-lite": Spec("gateway", "google/gemini-2.5-flash-lite"),
     "moondream-station": Spec("moondream"),
 }
 

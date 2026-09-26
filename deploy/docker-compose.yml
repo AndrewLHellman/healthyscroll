@@ -18,7 +18,7 @@ services:
     env_file: .env
     environment:
       VISION_MODEL: siglip2-base
-      VISION_CAPTIONER: gemini-3.5-flash-lite
+      VISION_CAPTIONER: gemini-2.5-flash-lite
       VISION_QUANTIZE: "false"
     ports:
       - "127.0.0.1:8000:8000"
