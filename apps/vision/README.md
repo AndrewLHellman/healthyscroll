@@ -1,32 +1,35 @@
-# apps/vision — frame analysis service
+# apps/vision — Reel description service
 
 FastAPI service that takes one Instagram Reel (its DASH manifest or a video URL,
-plus the poster) and the user's policy, pulls frames with ffmpeg **without
-downloading the whole video**, and decides whether the Reel shows what the user
-wants to skip.
+plus the poster), pulls frames with ffmpeg **without downloading the whole
+video**, and has a VLM write a short description of what's in them. It makes
+**no decisions** and never sees a user's policy: the extension sends the
+description to Jev (`/api/evaluate`, `frames[].caption`) together with the
+Reel's own text, and Jev decides.
 
 ```
                                           ┌── once per Reel, shared by ALL users (cached) ──┐
-extension ─POST /analyze──▶ vision ──────▶│ ffmpeg: 1 frame / 2 s (max 8) + poster, 448 px  │ ~150-500 ms
- (for upcoming Reels,                     │ SigLIP 2 image embeddings                        │ ~20 ms
-  in parallel with Jev text)              └──────────────────────────────────────────────────┘
-                                   per user: policy concepts · cached embeddings           <1 ms
+extension ─POST /describe─▶ vision ──────▶│ ffmpeg: 1 frame / 2 s (max 8) + poster, 448 px  │ ~0.5-1.5 s
+ (for upcoming Reels,                     │ VLM: <= 40 words — people, activities, objects, │ ~1-2 s gateway
+  in parallel with Jev text)              │      setting, quoted on-screen text              │ ~4 s laptop GPU
+                                          └──────────────────────────────────────────────────┘
                                           │
-             skip / allow ◀───────────────┤
-                                          │ uncertain
-                                          ▼
-               caption once per Reel in the background (Qwen3-VL-2B / Gemini)            ~4 s laptop
-               client polls GET /media/instagram/:id → sends caption to Jev (/api/evaluate)
+             description ◀────────────────┘   (or "pending" → poll GET /media/instagram/:id)
+                  │
+                  ▼
+   extension → Jev (/api/evaluate) with text + description → skip / allow
 ```
 
 - **Auth:** `Authorization: Bearer <Supabase access token>`, same as `/api/evaluate`.
   **Rate limit:** `VISION_RATE_PER_MIN` per user (prefetch multiplies calls).
-- **Never skip on error:** no frames / bad manifest → `422`; the extension leaves the video alone.
-- **Cache:** frames, embeddings and captions are per Reel and policy-independent, so a popular
-  Reel is fetched and analysed once; each extra user costs a dot product (+ a cheap Jev call).
-  In memory for now (one box).
-- **Scorers** live behind one interface (`vision/scorers`), so switching models is one env var.
-  The benchmark uses the exact same code.
+- **Never skip on error:** no frames / bad manifest → `422`; the extension lets Jev go on the
+  Reel's text alone.
+- **Cache:** frames and descriptions are per Reel, so a popular Reel is fetched and described
+  once; every extra user costs one Jev call. In memory for now (one box).
+- **Captioner** is `VISION_CAPTIONER`: `qwen3-vl-2b` on a GPU, `gemini-2.5-flash-lite` through the
+  AI Gateway on the deploy server (no GPU there). Models live behind one interface
+  (`vision/scorers`), which `bench/` also uses to compare them as *scorers* — that scoring path
+  is benchmark-only now; the service itself only calls `describe()`.
 - **Contract:** `packages/shared/src/vision.ts` (request/response + the client flow).
 
 ## Setup (Windows, from `apps/vision`)

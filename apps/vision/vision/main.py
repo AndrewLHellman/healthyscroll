@@ -185,6 +185,8 @@ async def _caption(media: Media) -> None:
     except Exception:
         log.exception("%s caption failed", media.key)
         media.caption_status = "failed"
+        # Let the next /describe for this Reel try again (the gateway may have been down).
+        media.caption_task = None
 
 
 def _ensure_caption(media: Media) -> asyncio.Task | None:
