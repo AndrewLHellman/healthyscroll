@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import type { EvaluateRequest } from "@healthyscroll/shared";
 import { decide } from "@/lib/jev";
+import { verifyRequest } from "@/lib/supabase";
 
 /**
  * POST /api/evaluate
@@ -9,8 +10,8 @@ import { decide } from "@/lib/jev";
  * Called by the extension's background worker once per stage per video.
  * Body: EvaluateRequest. Response: Decision. See packages/shared/src/types.ts.
  *
- * Stateless by design — no DB, no auth for the hackathon. If this ever needs
- * to be locked down, a per-install token in the extension is the simplest path.
+ * Requires `Authorization: Bearer <Supabase access token>` so only signed-in
+ * users can spend the AI Gateway key. Otherwise stateless — no DB.
  */
 
 const frameSchema = z.object({
@@ -37,9 +38,14 @@ const bodySchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  const userId = await verifyRequest(req.headers.get("authorization"));
+  if (!userId) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401, headers: CORS_HEADERS });
+  }
+
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400, headers: CORS_HEADERS });
   }
   const body = parsed.data as EvaluateRequest;
 
@@ -59,7 +65,7 @@ export async function POST(req: NextRequest) {
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "content-type",
+  "Access-Control-Allow-Headers": "content-type, authorization",
 };
 
 export function OPTIONS() {

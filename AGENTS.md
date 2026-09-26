@@ -25,6 +25,7 @@ Node >= 22.12 (`.nvmrc`). If corepack complains about a keyid, prefix with `CORE
 - **All TikTok DOM knowledge lives in `apps/extension/src/content/tiktok.ts`.** Nowhere else. Prefer `data-e2e` selectors.
 - **The content script never makes decisions.** It reports `VIDEO_CHANGED` and executes `SKIP_VIDEO`. Judgement is in `background/orchestrator.ts`.
 - **The extension never holds the AI Gateway key.** Jev is only called from `apps/web/lib/jev.ts`.
+- **Auth is Supabase + Google, run from the background worker** (`background/auth.ts`, session in `chrome.storage.local`). The API verifies the bearer token in `apps/web/lib/supabase.ts`. Extension ID is pinned by `key` in the manifest; the private key is `apps/extension/key.pem` (gitignored).
 - **Image bytes never leave the device.** Frames go to Moondream Station on `localhost:2020` only. Only text (metadata + captions) goes to our API.
 - **Never skip on error.** If Jev/Moondream/API fails, log and leave the video alone.
 - Cross-context message types are defined once in `apps/extension/src/lib/messages.ts`.

@@ -34,7 +34,7 @@ Status as of 2026-09-26: **TikTok adapter verified on the live For You page** (s
 - Moondream Cloud fallback route (`/api/describe`) for users without Station — opt-in, since frames leave the device.
 - Use a Jev `choice` question to tag *which* part of the policy matched, for a "skipped because: gambling" tooltip.
 - Unit tests for `decide()` with `Experimental_EvaluationMockModelV4`.
-- Per-install token on `/api/evaluate` if abuse becomes a concern.
+- Rate-limit `/api/evaluate` per Supabase user id if abuse becomes a concern.
 
 ## Known environment gotchas
 

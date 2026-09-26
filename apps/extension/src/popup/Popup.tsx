@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { UserPolicy } from "@healthyscroll/shared";
 import { getPolicy, setPolicy } from "../background/policyStore";
+import { sendAuthMessage, type AuthState, type PopupToBackground } from "../lib/messages";
 
 /**
  * The whole UI: one switch, one text box. Deliberately minimal.
@@ -9,12 +10,44 @@ import { getPolicy, setPolicy } from "../background/policyStore";
 export function Popup() {
   const [policy, setLocal] = useState<UserPolicy | null>(null);
   const [saved, setSaved] = useState(false);
+  const [auth, setAuth] = useState<AuthState | null>(null);
+  const [authBusy, setAuthBusy] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
     void getPolicy().then(setLocal);
+    void runAuth({ type: "AUTH_GET" });
   }, []);
 
-  if (!policy) return null;
+  // Sign-in runs in the background worker; if the popup closes mid-flow it
+  // picks up the new session next time it opens.
+  async function runAuth(msg: PopupToBackground) {
+    setAuthBusy(true);
+    setAuthError(null);
+    const res = await sendAuthMessage(msg);
+    if (res.ok) setAuth(res.auth);
+    else setAuthError(res.error);
+    setAuthBusy(false);
+  }
+
+  if (!policy || !auth) return null;
+
+  if (!auth.email) {
+    return (
+      <main className="p-5 flex flex-col gap-4 bg-white text-neutral-900">
+        <h1 className="text-base font-semibold tracking-tight">Healthy Scroll</h1>
+        <p className="text-sm text-neutral-500 leading-snug">Sign in to start filtering your feed.</p>
+        <button
+          onClick={() => void runAuth({ type: "AUTH_SIGN_IN" })}
+          disabled={authBusy}
+          className="rounded-lg bg-neutral-900 text-white text-sm py-2 hover:bg-neutral-800 active:bg-neutral-700 disabled:opacity-60 transition-colors"
+        >
+          {authBusy ? "Signing in…" : "Sign in with Google"}
+        </button>
+        {authError && <p className="text-xs text-red-600 leading-snug">{authError}</p>}
+      </main>
+    );
+  }
 
   const save = async () => {
     const next = await setPolicy({ prompt: policy.prompt, enabled: policy.enabled });
@@ -58,6 +91,17 @@ export function Popup() {
       <p className="text-[11px] text-neutral-400 leading-snug">
         Video frames are analysed on your device. Only text and short captions leave your machine.
       </p>
+
+      <footer className="flex items-center justify-between gap-2 text-[11px] text-neutral-400">
+        <span className="truncate">{auth.email}</span>
+        <button
+          onClick={() => void runAuth({ type: "AUTH_SIGN_OUT" })}
+          disabled={authBusy}
+          className="shrink-0 underline hover:text-neutral-600"
+        >
+          Sign out
+        </button>
+      </footer>
     </main>
   );
 }

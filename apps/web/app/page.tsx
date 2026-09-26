@@ -1,3 +1,5 @@
+import { AuthButton } from "./AuthButton";
+
 /**
  * Landing page. Placeholder copy + layout; the real design pass comes later.
  * Keep it to one idea: type what you don't want to see, and the feed obeys.
@@ -6,7 +8,10 @@ export default function Home() {
   return (
     <main className="mx-auto flex min-h-screen max-w-xl flex-col justify-center gap-10 px-6 py-24">
       <div className="flex flex-col gap-3">
-        <p className="text-xs uppercase tracking-widest text-neutral-400">Healthy Scroll</p>
+        <div className="flex items-center justify-between gap-4">
+          <p className="text-xs uppercase tracking-widest text-neutral-400">Healthy Scroll</p>
+          <AuthButton />
+        </div>
         <h1 className="text-4xl font-semibold tracking-tight leading-tight">
           Your prompt,
           <br />

@@ -18,7 +18,20 @@ export type BackgroundToContent =
   | { type: "SKIP_VIDEO"; videoId: string; decision: Decision }
   | { type: "DECISION"; decision: Decision };
 
+/** popup → background. Background replies with AuthResponse. */
+export type PopupToBackground =
+  | { type: "AUTH_GET" }
+  | { type: "AUTH_SIGN_IN" }
+  | { type: "AUTH_SIGN_OUT" };
+
+export type AuthState = { email: string | null };
+export type AuthResponse = { ok: true; auth: AuthState } | { ok: false; error: string };
+
 export function sendToBackground(msg: ContentToBackground): Promise<void> {
+  return chrome.runtime.sendMessage(msg);
+}
+
+export function sendAuthMessage(msg: PopupToBackground): Promise<AuthResponse> {
   return chrome.runtime.sendMessage(msg);
 }
 

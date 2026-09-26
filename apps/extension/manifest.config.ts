@@ -10,6 +10,9 @@ export default defineManifest({
   description:
     "Skips short-form videos that don't align with your goals. Your prompt, your feed.",
   version: "0.1.0",
+  // Pins the extension ID to bjobokpnmmjcmdiofgkpkajndmjekmej so OAuth redirect
+  // URLs (https://<id>.chromiumapp.org/) stay stable. Private key: key.pem (gitignored).
+  key: "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAmWq9d2PbJ7Ok/a9wmf+sYj6ln+gswdgEX0yA1icbPq6hPLURR1BH0wtcF2NRP7SmWlZPJDWq8LmonTC6vJqni8stChQjhfAoSjoDNJy7LH2hc4AIiLDtdn2ZWPZgTUtLSjeKYsUiaBUiWDA307s5pupEf2YAI0s1QzXoRkTWXXggga8vTacZdGsyAAT2hGWsIj/MA4u3/bOunD3rSecf4o3N02cibaQxhpJrPv+GzFPNutfNZe2xoZKAShLfWvqppCDdodGDHVrrIOW6HbRnof+0f017VBUnOjqiIt0QqkEtyTc/lKDjyR25P4QxMH4+V/65BKnjmzmYDBxCshmKMQIDAQAB",
   action: {
     default_popup: "src/popup/index.html",
     default_title: "Healthy Scroll",
@@ -31,6 +34,8 @@ export default defineManifest({
     // Needed for chrome.tabs.captureVisibleTab (frame capture) and messaging.
     "tabs",
     "activeTab",
+    // Google sign-in via Supabase (chrome.identity.launchWebAuthFlow).
+    "identity",
   ],
   host_permissions: [
     // The feed we observe.
@@ -40,5 +45,7 @@ export default defineManifest({
     // Our decision API (Jev lives behind it).
     "https://healthyscroll.net/*",
     "http://localhost:3000/*",
+    // Supabase auth (session exchange + token refresh).
+    "https://ikwvesahfsjpwdnwdfos.supabase.co/*",
   ],
 });

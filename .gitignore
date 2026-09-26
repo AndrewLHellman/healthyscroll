@@ -17,3 +17,6 @@ out/
 .DS_Store
 *.log
 .turbo/
+
+# extension signing key
+*.pem
