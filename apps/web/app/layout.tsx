@@ -19,7 +19,7 @@ const mono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Healthy Scroll — your prompt, your feed",
+  title: "Healthy Scroll: your prompt, your feed",
   description:
     "A Chrome extension that skips the videos you asked not to see, before they get a chance to hook you. Decisions in about 200 ms. Frames never leave your laptop.",
   metadataBase: new URL("https://healthyscroll.net"),

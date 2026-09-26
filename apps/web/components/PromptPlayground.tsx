@@ -7,7 +7,7 @@ import { CLIPS } from "@/lib/playground/clips";
 import { getScorer } from "@/lib/playground/scorers";
 
 /**
- * The product is one text box, so this section is one text box. Type (or pick)
+ * The prompt is one text box, so this section is one text box. Type (or pick)
  * a prompt and a strip of mock clips re-scores. Scoring goes through a
  * `Scorer` (lib/playground/scorers.ts): a keyword lookup by default, real Jev
  * when `NEXT_PUBLIC_PLAYGROUND_SCORER=jev`. Verdicts come from the same
@@ -67,7 +67,7 @@ export function PromptPlayground() {
     : pending
       ? `asking jev about ${CLIPS.length} clips…`
       : skipped === 0
-        ? "nothing in this feed matches — try adding a word"
+        ? "nothing in this feed matches · try adding a word"
         : `${skipped} of ${CLIPS.length} skipped · edit a word and watch it change`;
 
   return (
@@ -149,10 +149,10 @@ export function PromptPlayground() {
 
 function ScoreLine({ p, v }: { p: Score; v: Verdict | null }) {
   const color = v === "skip" ? "text-skip" : v === "allow" ? "text-keep" : "text-muted";
-  const label = v === "skip" ? "skip" : v === "allow" ? "keep" : v === "uncertain" ? "look closer" : "—";
+  const label = v === "skip" ? "skip" : v === "allow" ? "keep" : v === "uncertain" ? "look closer" : "·";
   return (
     <p className="mt-1.5 flex items-center justify-between font-mono text-[11px] tabular-nums">
-      <span className={p === null ? "text-faint" : color}>{p === null ? "—" : p.toFixed(2)}</span>
+      <span className={p === null ? "text-faint" : color}>{p === null ? "·" : p.toFixed(2)}</span>
       <span className="text-faint">{label}</span>
     </p>
   );

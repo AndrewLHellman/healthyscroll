@@ -16,8 +16,8 @@ const COLUMNS = [
     title: 'Runs on',
     links: [
       { label: 'TikTok (web)', href: '#faq' },
-      { label: 'Instagram Reels — soon', href: '#faq' },
-      { label: 'YouTube Shorts — soon', href: '#faq' },
+      { label: 'Instagram Reels (soon)', href: '#faq' },
+      { label: 'YouTube Shorts (soon)', href: '#faq' },
     ],
   },
   {
@@ -25,7 +25,7 @@ const COLUMNS = [
     links: [
       {
         label: 'Jev by TypeSafe AI',
-        href: 'https://vercel.com/ai-gateway/models/jev',
+        href: 'https://typesafe.ai/',
       },
       { label: 'Moondream', href: 'https://moondream.ai' },
       { label: 'Vercel AI Gateway', href: 'https://vercel.com/ai-gateway' },
@@ -34,7 +34,10 @@ const COLUMNS = [
   {
     title: 'Project',
     links: [
-      { label: 'GitHub', href: 'https://github.com' },
+      {
+        label: 'GitHub',
+        href: 'https://github.com/AndrewLHellman/healthyscroll',
+      },
       { label: 'TigerHacks 2026', href: '#' },
     ],
   },

@@ -1,5 +1,5 @@
 /**
- * A faithful, static rendering of the extension popup — the entire UI.
+ * A faithful, static rendering of the extension popup.
  * Mirrors apps/extension/src/popup/Popup.tsx; if that changes, change this.
  */
 import { Mark } from "./Mark";

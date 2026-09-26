@@ -39,7 +39,7 @@ function Hero() {
         </h1>
         <p className="mt-6 max-w-2xl text-lg leading-relaxed text-muted">
           Healthy Scroll reads each video as it lands in your TikTok feed and skips anything that
-          matches what you asked to avoid — in about 200 milliseconds, without you lifting a finger.
+          matches what you asked to avoid, in about 200 milliseconds, without you lifting a finger.
           You write the rule in plain English. It does the scrolling.
         </p>
         <div className="mt-8 flex flex-wrap items-center gap-4">
@@ -73,7 +73,7 @@ const STAGES = [
     n: "01",
     time: "~200 ms",
     title: "Read the words",
-    body: "The moment a new video lands, its caption, hashtags, sound and visible comments go to Jev — a model that answers one question with a calibrated probability: does this match what you asked to skip? No prose, nothing to parse. Most videos are decided right here, before you’ve registered them.",
+    body: "The moment a new video lands, its caption, hashtags, sound and visible comments go to Jev, a model that answers one question with a calibrated probability: does this match what you asked to skip? No prose, nothing to parse. Most videos are decided right here, before you’ve registered them.",
     trace: [
       ["text", "jev", "does this match the policy?"],
       ["", "", "0.96 · skip · 184 ms"],
@@ -173,7 +173,7 @@ function Week() {
         <SectionHeading
           eyebrow="Your week"
           title="It also keeps a tally. Of what actually holds you."
-          body="The same Jev call that decides skip-or-keep also says what kind of video it was, for free. Add how long you stayed on each one and you get a week you can read: not a screen-time number, but which videos you can’t put down. The tally lives in your browser and nowhere else."
+          body="The same Jev call that decides skip-or-keep also says what kind of video it was, for free. Add how long you stayed on each one and you get a week you can read: not a screen-time number, but which videos you can’t put down. The dwell tally stays in your browser."
         />
         <div className="mt-12">
           <WeekMock />
@@ -191,7 +191,7 @@ function Week() {
 const FAQ = [
   {
     q: "Where does it work?",
-    a: "TikTok in Chrome, today. The part that reads the page is a small adapter, so Instagram Reels and YouTube Shorts are next. Not the phone apps — this is a browser extension.",
+    a: "TikTok in Chrome, today. The part that reads the page is a small adapter, so Instagram Reels and YouTube Shorts are next. It’s a browser extension, so it works where you scroll in a browser, not inside the phone apps.",
   },
   {
     q: "Do I need anything else?",
@@ -207,15 +207,15 @@ const FAQ = [
   },
   {
     q: "What’s doing the deciding?",
-    a: "Jev, an evaluation model by TypeSafe AI, through Vercel AI Gateway — it returns probabilities instead of prose, which is why it’s fast and nearly free per video. Moondream, a ~2B-parameter vision model, describes frames on your device.",
+    a: "Jev, an evaluation model by TypeSafe AI, through Vercel AI Gateway. It returns probabilities instead of prose, which is why it’s fast and nearly free per video. Moondream, a ~2B-parameter vision model, describes frames on your device.",
   },
   {
     q: "Where does my data go?",
-    a: "Pixels stop at your laptop. Frames go to Moondream on localhost and nowhere else; the only thing that reaches our server is text — caption, hashtags, comments and Moondream’s one-sentence description — with nothing stored. Your week’s tally lives in the extension’s local storage. Clear it any time.",
+    a: "Pixels stop at your laptop. Frames go to Moondream on localhost and nowhere else; what reaches our server is text (caption, hashtags, comments and Moondream’s one-sentence description), used for the decision and not kept. If you sign in, we store your prompt and a log of skips (which video, when, which check caught it) so your dashboard can count them. The week’s dwell tally lives in the extension’s local storage. Clear it any time.",
   },
   {
     q: "What does the tally track?",
-    a: "Per video: which of fourteen categories Jev put it in, how long it was on screen, and whether it was skipped. Not the video itself, not who posted it, not what you liked. Categories are broad on purpose — “relationships & drama”, not a profile of you.",
+    a: "Per video: which of fourteen categories Jev put it in, how long it was on screen, and whether it was skipped. Not the video itself, not who posted it, not what you liked. Categories are broad on purpose: “relationships & drama”, not a profile of you.",
   },
   {
     q: "What does it cost?",
@@ -255,9 +255,9 @@ function FinalCta() {
     <section className="border-t border-line bg-mist/60">
       <div className="mx-auto grid max-w-6xl items-center gap-12 px-5 py-20 sm:px-8 sm:py-28 lg:grid-cols-[1fr_auto]">
         <div className="max-w-xl">
-          <p className="text-xs font-medium uppercase tracking-wider text-faint">The whole app</p>
+          <p className="text-xs font-medium uppercase tracking-wider text-faint">Setup</p>
           <h2 className="mt-3 font-display text-3xl font-semibold leading-tight tracking-tight sm:text-5xl">
-            One switch. One text box. That’s the entire interface.
+            One text box. That’s the setup.
           </h2>
           <p className="mt-5 text-lg leading-relaxed text-muted">
             No streaks, no scores, no nagging. The algorithm already optimises for your attention;

@@ -37,7 +37,7 @@ const CLIPS: Clip[] = [
   {
     author: "trail.mornings",
     desc: "6am loop before work. always worth it",
-    sound: "Avril 14th — Aphex Twin",
+    sound: "Avril 14th · Aphex Twin",
     tone: ["#d9c7a3", "#5e6a4e"],
     text: { p: 0.03, ms: 171 },
     visual: { caption: "a person running on a dirt trail at sunrise, trees on both sides", p: 0.02, ms: 1240 },
