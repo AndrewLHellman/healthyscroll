@@ -158,6 +158,16 @@ window.setInterval(checkActive, 250);
 checkActive();
 
 chrome.runtime.onMessage.addListener((msg: BackgroundToContent) => {
+  if (msg.type === "REEL_WANTED") {
+    // Background lost (or never had) this Reel. If the hook has seen it, it
+    // re-sends it -> REELS_DISCOVERED. Unknown codes are already being
+    // requested by checkActive's timer; don't fetch twice.
+    if (known.has(msg.code)) {
+      log("background wants", msg.code);
+      window.postMessage({ source: HELLO_SOURCE, want: msg.code }, window.location.origin);
+    }
+    return;
+  }
   if (msg.type !== "SKIP_REEL") return;
   // Guard: only skip the Reel that's still on screen.
   if (msg.code !== getActiveReelCode()) return;

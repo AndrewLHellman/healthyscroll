@@ -52,7 +52,14 @@ export type BackgroundToContent =
   | { type: "SKIP_VIDEO"; videoId: string; decision: Decision }
   | { type: "DECISION"; decision: Decision }
   /** Instagram: move past this Reel (by shortcode), if it's still the one on screen. */
-  | { type: "SKIP_REEL"; code: string; reason: string };
+  | { type: "SKIP_REEL"; code: string; reason: string }
+  /**
+   * Instagram: background has no data for the Reel on screen — send it again.
+   * Happens after the background was unloaded (Chrome kills an idle service
+   * worker after ~30 s; Safari drops the page anytime): everything it had
+   * judged is gone, and the hook only reports each Reel once.
+   */
+  | { type: "REEL_WANTED"; code: string };
 
 /** popup → background. Background replies with AuthResponse. */
 export type PopupToBackground =

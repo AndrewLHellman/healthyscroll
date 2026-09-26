@@ -69,7 +69,13 @@ export function onReelsDiscovered(tabId: number, infos: ReelInfo[], policy: User
 export function onReelActive(tabId: number, code: string, policy: UserPolicy): void {
   activeByTab.set(tabId, code);
   const record = reels.get(code);
-  if (!record) return; // no media data yet; onReelsDiscovered will call back
+  if (!record) {
+    // Either the hook hasn't parsed this Reel yet (onReelsDiscovered will call
+    // back), or this background was just (re)started and lost every judgement.
+    // Ask the page to send it again; judge() dedupes if both arrive.
+    sendToTab(tabId, { type: "REEL_WANTED", code }).catch(() => {});
+    return;
+  }
   // Policy edited since this Reel was judged -> judge again.
   const current = record.policyPrompt === policy.prompt ? record : judge(record.info, policy, true);
   void current.judgement.then(async (j) => {
