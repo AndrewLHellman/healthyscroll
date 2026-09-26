@@ -32,8 +32,8 @@ function Headline({ stats, empty }: { stats: Stats; empty: boolean }) {
   if (empty) {
     return (
       <p className="max-w-xl text-lg leading-relaxed text-muted">
-        <span className="text-ink">Nothing to show yet.</span> Save a prompt, open Instagram in Safari, and every Reel
-        you scroll past is counted here.
+        <span className="text-ink">Get to know your scrolling habits.</span> Once you start browsing with
+        Healthy Scroll, you’ll see what you watched, what your filter skipped, and where your time went.
       </p>
     );
   }
@@ -53,7 +53,7 @@ function Headline({ stats, empty }: { stats: Stats; empty: boolean }) {
       />
       <Stat
         value={formatDuration(stats.seconds * 1000)}
-        label="watching"
+        label="spent watching"
         note={`about ${formatDuration((stats.seconds / stats.days.length) * 1000)} a day`}
       />
     </div>
@@ -109,7 +109,7 @@ function SkippedByKind({ stats, empty }: { stats: Stats; empty: boolean }) {
   const top = stats.skippedByCategory.filter((c) => c.category !== REST).slice(0, TOP_N).map((c) => c.category);
   return (
     <Figure
-      title="Skipped, by kind"
+      title="What your filter skipped"
       hint={`${shortDate(stats.days[0].ts)} – today`}
       aside={stats.skipped > 0 ? <Legend stats={stats} top={top} /> : undefined}
     >
@@ -139,7 +139,7 @@ function Legend({ stats, top }: { stats: Stats; top: Category[] }) {
         )}
       </ul>
       <p className="font-mono text-[11px] text-faint">
-        most in a day: {busiest.skipped}, {longDate(busiest.ts)}
+        most skips in a day: {busiest.skipped} on {longDate(busiest.ts)}
       </p>
     </div>
   );
@@ -208,11 +208,11 @@ function ShareSkipped({ days }: { days: DayStat[] }) {
 
   return (
     <Figure
-      title="Share of each day skipped"
-      hint={`last ${days.length} days · time watching above each day`}
+      title="How much of your feed was skipped"
+      hint={`last ${days.length} days`}
       aside={
         <p className="font-mono text-[11px] text-faint">
-          {pct(seen ? skipped / seen : 0)} over the fortnight · {formatDuration(days.reduce((a, d) => a + d.seconds, 0) * 1000)}{" "}
+          {pct(seen ? skipped / seen : 0)} of Reels skipped · {formatDuration(days.reduce((a, d) => a + d.seconds, 0) * 1000)}{" "}
           watching
         </p>
       }
@@ -244,7 +244,7 @@ function ShareSkipped({ days }: { days: DayStat[] }) {
 }
 
 function shareTitle(d: DayStat): string {
-  if (!d.seen) return `${longDate(d.ts)} · nothing`;
+  if (!d.seen) return `${longDate(d.ts)} · no Reels recorded`;
   return `${longDate(d.ts)} · ${pct(d.skipped / d.seen)} skipped (${d.skipped} of ${d.seen}) · ${formatDuration(d.seconds * 1000)} watching`;
 }
 

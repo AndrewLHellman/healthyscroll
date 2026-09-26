@@ -11,7 +11,7 @@ import { computeStats, longDate, type ReelLite } from "./stats";
 import { buildSampleReels, SAMPLE_ALL_TIME, SAMPLE_PROMPT } from "./sample";
 
 const WINDOW_DAYS = 28;
-const PLACEHOLDER = "e.g. gambling, drinking, thirst-trap content, anything that makes me feel worse about myself";
+const PLACEHOLDER = "e.g. gambling, rage bait, anything that makes me compare my body to someone else’s";
 
 /**
  * Two parts, in the order they matter: the prompt (the one thing you control)
@@ -43,7 +43,7 @@ function SignedOut() {
       <div>
         <h1 className="font-display text-3xl font-semibold tracking-tight">Your dashboard</h1>
         <p className="mt-3 text-lg leading-relaxed text-muted">
-          Your prompt, and a count of what it has skipped. Use the same Google account as the extension.
+          Choose what you’d like less of in your feed and see what Healthy Scroll has skipped. Sign in with the Google account you use in the extension.
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-5">
@@ -54,7 +54,7 @@ function SignedOut() {
           Sign in with Google
         </button>
         <a href="/dashboard?sample=1" className="rounded-md text-sm text-muted transition-colors hover:text-ink">
-          See a sample →
+          Preview the dashboard →
         </a>
       </div>
     </div>
@@ -140,7 +140,7 @@ function Dashboard({
       {readOnly && (
         <p className="mb-8 inline-flex w-fit items-center gap-2 rounded-full border border-line px-3 py-1 text-xs text-muted">
           <span className="h-1.5 w-1.5 rounded-full bg-skip" aria-hidden />
-          Sample data.{" "}
+          Dashboard preview.{" "}
           <a href="/dashboard" className="rounded-md text-ink underline decoration-line underline-offset-2 hover:decoration-ink">
             Sign in
           </a>{" "}
@@ -151,14 +151,14 @@ function Dashboard({
       <section aria-labelledby="prompt-heading" className="pb-14">
         <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
           <h1 id="prompt-heading" className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">
-            Your prompt
+            Set your own limits
           </h1>
           <p className="font-mono text-[11px] text-faint">
             {updatedAt ? `saved ${longDate(new Date(updatedAt).getTime())}` : "not saved yet"}
           </p>
         </div>
         <p className="mt-3 max-w-xl text-lg leading-relaxed text-muted">
-          What the extension skips. Edits apply from the next Reel.
+          What would you like less of in your feed? Describe it below, whether you’re changing a habit or just tired of seeing the same thing.
         </p>
         <div className="mt-8">
           <PromptEditor key={prompt} userId={userId} initial={prompt} readOnly={readOnly} />
@@ -170,7 +170,7 @@ function Dashboard({
           <h2 id="feed-heading" className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">
             Last four weeks
           </h2>
-          {!!allTime && <p className="font-mono text-[11px] text-faint">{allTime.toLocaleString()} skipped all time</p>}
+          {!!allTime && <p className="font-mono text-[11px] text-faint">{allTime.toLocaleString()} skipped in total</p>}
         </div>
         <div className="mt-10">
           <FeedStats stats={stats} allTime={allTime} />
@@ -206,7 +206,7 @@ function PromptEditor({ userId, initial, readOnly }: { userId?: string; initial:
   return (
     <div className="flex flex-col gap-4">
       <label className="flex flex-col gap-1.5">
-        <span className="text-xs text-muted">Skip anything that’s…</span>
+        <span className="text-xs text-muted">Skip Reels about…</span>
         <textarea
           className="min-h-32 w-full resize-y rounded-lg border border-line bg-paper p-4 text-base leading-relaxed outline-none transition-colors focus:border-ink disabled:text-ink"
           placeholder={PLACEHOLDER}
@@ -225,13 +225,13 @@ function PromptEditor({ userId, initial, readOnly }: { userId?: string; initial:
           disabled={readOnly || !dirty || status === "saving"}
           className="rounded-full bg-ink px-5 py-2 text-sm font-medium text-paper transition-colors hover:bg-ink/85 disabled:cursor-default disabled:opacity-40"
         >
-          {status === "saving" ? "Saving…" : "Save"}
+          {status === "saving" ? "Saving…" : "Save prompt"}
         </button>
         <span className="text-xs text-faint" role="status">
           {status === "error" ? (
-            <span className="text-skip">Couldn’t save. Try again.</span>
+            <span className="text-skip">Couldn’t save your prompt. Please try again.</span>
           ) : status === "saved" ? (
-            <span className="text-keep">Saved.</span>
+            <span className="text-keep">Prompt saved.</span>
           ) : dirty ? (
             "Unsaved changes"
           ) : null}

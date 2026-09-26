@@ -101,21 +101,21 @@ export function computeStats(reels: ReelLite[], opts: { days?: number; now?: num
 
 /* ------------------------------------------------------------ formatting */
 
-const MONTH = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const WEEKDAY = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MONTH = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const WEEKDAY = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
-/** "23 Sep" */
+/** "September 23" */
 export function shortDate(ts: number): string {
   const d = new Date(ts);
-  return `${d.getDate()} ${MONTH[d.getMonth()]}`;
+  return `${MONTH[d.getMonth()]} ${d.getDate()}`;
 }
 
-/** "Tue 23 Sep" */
+/** "September 23" */
 export function longDate(ts: number): string {
-  return `${WEEKDAY[new Date(ts).getDay()]} ${shortDate(ts)}`;
+  return shortDate(ts);
 }
 
-/** "Tue" */
+/** "Tuesday" */
 export function weekday(ts: number): string {
   return WEEKDAY[new Date(ts).getDay()];
 }

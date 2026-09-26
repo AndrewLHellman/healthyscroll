@@ -5,7 +5,7 @@ import { DashboardClient } from "./DashboardClient";
 
 export const metadata: Metadata = {
   title: "Dashboard · Healthy Scroll",
-  description: "Your prompt, and what Healthy Scroll has skipped for you.",
+  description: "Choose what you’d like less of in your feed and see what your filter has skipped.",
   robots: { index: false },
 };
 
@@ -21,7 +21,7 @@ export default function DashboardPage() {
       <footer className="border-t border-line">
         <div className="mx-auto flex max-w-3xl flex-col gap-2 px-5 py-6 text-xs text-faint sm:flex-row sm:items-center sm:justify-between sm:px-8">
           <span>© 2026 Healthy Scroll. Open source.</span>
-          <span>Frames are described and discarded, never stored.</span>
+          <span>Video frames aren’t stored.</span>
         </div>
       </footer>
     </>
