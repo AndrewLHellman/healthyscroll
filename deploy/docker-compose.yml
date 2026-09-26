@@ -10,17 +10,14 @@ services:
     ports:
       - "127.0.0.1:3001:3000"
 
-  # vision.healthyscroll.net (nginx in front). CPU box: SigLIP 2 scores, the
-  # gateway captions. One process on purpose: the per-Reel cache is in memory.
+  # vision.healthyscroll.net (nginx in front). Describes Reels through the AI
+  # Gateway (no GPU here). One process on purpose: the per-Reel cache is in memory.
   vision:
     image: ghcr.io/andrewlhellman/healthyscroll-vision:latest
     restart: unless-stopped
     env_file: .env
     environment:
-      VISION_MODEL: siglip2-base
       VISION_CAPTIONER: gemini-2.5-flash-lite
-      VISION_QUANTIZE: "false"
     ports:
       - "127.0.0.1:8000:8000"
-    # SigLIP 2 base is 375M params in fp32 (~1.5 GB) plus the frame cache.
-    mem_limit: 4g
+    mem_limit: 1g

@@ -1,12 +1,10 @@
 """
-Global, policy-independent media cache: one entry per Reel, shared by every user.
+Global media cache: one entry per Reel, shared by every user.
 
-Fetching frames and embedding them is the expensive part and doesn't depend on
-who is watching, so a popular Reel is only analysed once. Per-user work on top
-(SigLIP scoring against the user's policy, Jev) is milliseconds.
+Fetching frames and describing them doesn't depend on who is watching, so a
+popular Reel is only fetched and captioned once. Nothing here is per user.
 
-Frames are kept as JPEG bytes (~20 KB each) so the caption model can run later,
-only for Reels whose fast score came back uncertain.
+Frames are kept as JPEG bytes (~20 KB each) until the caption is written.
 
 In-memory for now; move to Redis/Supabase if the service runs on more than one box.
 """
@@ -19,7 +17,7 @@ from collections import OrderedDict
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from io import BytesIO
-from typing import Any, Literal
+from typing import Literal
 
 from PIL import Image
 
@@ -33,12 +31,10 @@ class Media:
     timestamps: list[float]
     frames_ms: float
     input_desc: str
-    # Scorer-specific, policy-independent features (SigLIP image embeddings).
-    features: Any = None
-    # Policy-dependent scores for scorers without features (VLM Yes/No), keyed by policy hash.
-    scores: dict[str, float] = field(default_factory=dict)
     caption: str | None = None
     caption_status: CaptionStatus = "none"
+    # The one in-flight caption for this Reel; /describe callers wait on it together.
+    caption_task: asyncio.Task | None = None
     created_at: float = field(default_factory=time.time)
 
     def images(self) -> list[Image.Image]:

@@ -3,29 +3,30 @@ import { sendToTab, type ReelInfo } from "../lib/messages";
 import { evaluate } from "./jevClient";
 import { recordSkip } from "./sync";
 import { rememberCategory } from "./tally";
-import { analyze, waitForCaption } from "./visionClient";
+import { describeAndWait } from "./visionClient";
 
 /**
  * Instagram Reels pipeline. Every Reel is judged as soon as the page loads it —
  * usually several Reels before the viewer gets there — so the decision is
  * waiting when it comes on screen.
  *
- *   in parallel:  Jev on text (caption, hashtags, author, audio)      ~300 ms
- *                 vision /analyze: SigLIP on frames (cached per Reel)  ~1 s cold
- *   skip as soon as either says skip (a slow one never holds up a fast one).
- *   vision already resolves its own "uncertain" with its VLM (deep: true), so it
- *                 normally answers skip/allow. Only if the server has no VLM
- *                 does it stay "uncertain": then wait for the Reel's caption and
- *                 let Jev decide from it.
- *   anything else, or any error -> leave the Reel alone (never skip on error).
+ * Jev makes every decision. The vision service only turns the video into text.
+ *
+ *   in parallel:  Jev on the Reel's text (caption, hashtags, author, audio)  ~300 ms
+ *                 vision /describe: frames -> a short description            ~1-3 s cold
+ *   a text-only "skip" from Jev skips right away (a slow signal never holds up a
+ *   fast one). Once the description is in, Jev runs again on text + description,
+ *   and that answer is final.
+ *   no description (no media, or the service failed) -> Jev's text answer stands.
+ *   any error -> leave the Reel alone (never skip on error).
  *
  * The TikTok pipeline (orchestrator.ts) is separate and unchanged.
  */
 
 export interface Judgement {
   verdict: "skip" | "allow";
-  /** Which signal decided: text-only Jev, SigLIP, or Jev on the Reel's caption. */
-  stage: "text" | "visual" | "caption" | "none";
+  /** What Jev saw when it decided: the Reel's text only, or text + what's on screen. */
+  stage: "text" | "visual" | "none";
   reason: string;
   decision?: Decision;
 }
@@ -135,24 +136,46 @@ async function decide(info: ReelInfo, context: VideoContext, policy: UserPolicy)
 
   const hasMedia = Boolean(info.manifest || info.videoUrl);
   const textP = evaluate({ policy: { prompt: policy.prompt }, context });
-  // The category rides on the text pass; keep it whichever signal decides.
+  // The category rides on the text pass; keep it whichever pass decides.
   textP.then((d) => noteCategory(info.code, d), () => {});
-  const visionP = hasMedia
-    ? analyze({
+  textP.catch((err) => console.warn("[reels] text pass failed", info.code, err));
+
+  // What's on screen, as text. Never throws: null means Jev goes on the Reel's text alone.
+  const descriptionP: Promise<string | null> = hasMedia
+    ? describeAndWait({
         videoId: info.id,
         platform: "instagram",
-        policy: policy.prompt,
         // Prefer the manifest: the server range-fetches only what it needs.
         ...(info.manifest ? { manifest: info.manifest } : { videoUrl: info.videoUrl }),
         posterUrl: info.posterUrl,
-        // If the fast frame score is unsure, the server's VLM settles it in the same call.
-        deep: true,
+      }).catch((err) => {
+        console.warn("[reels] describe failed", info.code, err);
+        return null;
       })
-    : Promise.reject(new Error("no media in capture"));
-  textP.catch((err) => console.warn("[reels] text pass failed", info.code, err));
-  visionP.catch((err) => console.warn("[reels] vision failed", info.code, err));
+    : Promise.resolve(null);
 
-  // Skip on whichever answers "skip" first; don't let a slow signal hold up a fast one.
+  // Jev on text + description is the final word; it needs the description first.
+  const fullP = descriptionP.then(async (description): Promise<Judgement | null> => {
+    if (!description) return null;
+    try {
+      const d = await evaluate({
+        policy: { prompt: policy.prompt },
+        context,
+        frames: [{ videoId: info.id, atMs: 0, caption: description }],
+      });
+      return {
+        verdict: d.verdict === "skip" ? "skip" : "allow",
+        stage: "visual",
+        reason: `text+frames p=${d.violatesProbability.toFixed(2)}: ${description.slice(0, 80)}`,
+        decision: { ...d, stage: "visual" },
+      };
+    } catch (err) {
+      console.warn("[reels] text+frames pass failed", info.code, err);
+      return null;
+    }
+  });
+
+  // A text-only skip is enough to act on; don't wait for the video to be described.
   const textSkip = textP.then((d): Judgement => {
     if (d.verdict !== "skip") throw new Error("not skip");
     return {
@@ -162,60 +185,19 @@ async function decide(info: ReelInfo, context: VideoContext, policy: UserPolicy)
       decision: { ...d, stage: "text" },
     };
   });
-  const visionSkip = visionP.then((v): Judgement => {
-    if (v.verdict !== "skip") throw new Error("not skip");
-    return {
-      verdict: "skip",
-      stage: "visual",
-      reason:
-        v.deepProbability != null
-          ? `VLM p=${v.deepProbability.toFixed(2)} (frames unsure)`
-          : `frames matched ${v.matched ?? "policy"}`,
-      decision: {
-        videoId: info.id,
-        verdict: "skip",
-        violatesProbability: v.violatesProbability,
-        stage: "visual",
-        latencyMs: v.totalMs,
-      },
-    };
+  const fullSkip = fullP.then((j): Judgement => {
+    if (j?.verdict !== "skip") throw new Error("not skip");
+    return j;
   });
-  const firstSkip = await Promise.any([textSkip, visionSkip]).catch(() => null);
+  const firstSkip = await Promise.any([textSkip, fullSkip]).catch(() => null);
   if (firstSkip) return firstSkip;
 
-  // Neither said skip. Vision only stays "uncertain" when the server has no VLM to
-  // settle it; then it's captioning the Reel, and Jev makes the call from that.
-  const [text, vision] = await Promise.allSettled([textP, visionP]);
-  if (vision.status === "fulfilled" && vision.value.verdict === "uncertain") {
-    const v = vision.value;
-    const caption =
-      v.captionStatus === "ready" && v.caption ? v.caption : await waitForCaption("instagram", info.id);
-    if (caption) {
-      try {
-        const withCaption = await evaluate({
-          policy: { prompt: policy.prompt },
-          context,
-          frames: [{ videoId: info.id, atMs: 0, caption }],
-        });
-        if (withCaption.verdict === "skip") {
-          return {
-            verdict: "skip",
-            stage: "caption",
-            reason: `caption p=${withCaption.violatesProbability.toFixed(2)}: ${caption.slice(0, 80)}`,
-            // The skips table knows text/visual/monitor; a caption is a visual signal.
-            decision: { ...withCaption, stage: "visual" },
-          };
-        }
-        return { verdict: "allow", stage: "caption", reason: `caption p=${withCaption.violatesProbability.toFixed(2)}` };
-      } catch (err) {
-        console.warn("[reels] caption pass failed (Jev unavailable?)", info.code, err);
-      }
-    }
+  const [text, full] = await Promise.allSettled([textP, fullP]);
+  if (full.status === "fulfilled" && full.value) return full.value;
+  if (text.status === "fulfilled") {
+    return { verdict: "allow", stage: "text", reason: `text p=${text.value.violatesProbability.toFixed(2)}, no description` };
   }
-
-  const tp = text.status === "fulfilled" ? text.value.violatesProbability.toFixed(2) : "failed";
-  const vv = vision.status === "fulfilled" ? vision.value.verdict : "failed";
-  return { verdict: "allow", stage: "none", reason: `text p=${tp}, vision ${vv}` };
+  return { verdict: "allow", stage: "none", reason: "Jev unavailable" };
 }
 
 function toContext(info: ReelInfo): VideoContext {

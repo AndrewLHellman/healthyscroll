@@ -1,58 +1,45 @@
-import type { Verdict } from "./types";
-
 /**
  * Contract for apps/vision (FastAPI). Mirrors the pydantic models in
  * apps/vision/vision/main.py; change both together.
  *
+ * The vision service decides nothing: it turns a Reel's video into a short
+ * description, once, shared by every user. Jev makes every decision.
+ *
  * Client flow for one upcoming Reel (sent as soon as it appears, before the
  * viewer swipes to it):
- *   1. POST /api/evaluate (Jev, text only)  and  POST {vision}/analyze { deep: true },
- *      in parallel. Skip as soon as either says "skip".
- *   2. With deep, the server settles an unsure frame score itself with its VLM, so
- *      analyze answers "skip" or "allow" (~1 s cold, cached per Reel).
- *   3. Only if the server has no VLM does analyze stay "uncertain": poll
- *      GET {vision}/media/instagram/:videoId for the caption and send it to
- *      /api/evaluate as frames: [{ caption }]. Any error -> leave the Reel alone.
+ *   1. POST /api/evaluate (Jev on the Reel's text)  and  POST {vision}/describe,
+ *      in parallel. A text-only "skip" from Jev skips right away.
+ *   2. When the description arrives, POST /api/evaluate again with
+ *      frames: [{ caption }] — text plus what's on screen — and Jev's answer is final.
+ *   3. If describe is still "pending", poll GET {vision}/media/instagram/:videoId.
+ *      Any error or timeout -> Jev's text-only answer stands (never skip on error).
  */
-export interface VisionAnalyzeRequest {
+export interface VisionDescribeRequest {
   videoId: string;
   platform: "instagram" | "tiktok";
-  /** The user's policy text. */
-  policy: string;
   /** DASH MPD XML from Instagram's API response. Send this or `videoUrl`, not both. */
   manifest?: string;
   /** Progressive MP4 URL (smallest `video_versions` entry), when there's no manifest. */
   videoUrl?: string;
   /** The Reel's cover image; used as frame 0. */
   posterUrl?: string;
-  /**
-   * Also have the server's VLM (Qwen3-VL) answer "does this match the policy?"
-   * from the frames and decide outright (skip/allow). Fallback for uncertain
-   * Reels when Jev is unavailable. ~0.4 s, cached per Reel + policy.
-   */
-  deep?: boolean;
 }
 
 export type VisionCaptionStatus = "none" | "pending" | "ready" | "failed";
 
-export interface VisionAnalyzeResponse {
+export interface VisionDescribeResponse {
   videoId: string;
-  verdict: Verdict;
-  /** On the scorer's own scale (SigLIP: small numbers); use `verdict`, not this, to decide. */
-  violatesProbability: number;
-  model: string;
-  /** Best-matching policy concept and frame, e.g. "casinos @ 2.5s". */
-  matched?: string | null;
   frames: number;
   /** True when the Reel's frames came from the shared cache (another user saw it first). */
   mediaCached: boolean;
   framesMs: number;
-  modelMs: number;
   totalMs: number;
+  /** "ready" -> `caption` is set. "pending" -> poll GET /media/... . "failed" -> give up. */
   captionStatus: VisionCaptionStatus;
+  /** <= 40 words: people, activities, objects, setting, quoted on-screen text. */
   caption?: string | null;
-  /** Only with deep: the VLM's P(yes). */
-  deepProbability?: number | null;
+  /** Which VLM wrote it. */
+  model: string;
 }
 
 /** GET /media/:platform/:videoId */

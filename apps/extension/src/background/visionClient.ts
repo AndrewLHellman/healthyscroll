@@ -1,6 +1,6 @@
 import type {
-  VisionAnalyzeRequest,
-  VisionAnalyzeResponse,
+  VisionDescribeRequest,
+  VisionDescribeResponse,
   VisionMediaResponse,
 } from "@healthyscroll/shared";
 import { VISION_BASE_URL } from "../lib/config";
@@ -11,29 +11,33 @@ import { authedFetch } from "./auth";
  * Contract and client flow: packages/shared/src/vision.ts.
  */
 
-export async function analyze(req: VisionAnalyzeRequest): Promise<VisionAnalyzeResponse> {
-  const res = await authedFetch(`${VISION_BASE_URL}/analyze`, {
+export async function describe(req: VisionDescribeRequest): Promise<VisionDescribeResponse> {
+  const res = await authedFetch(`${VISION_BASE_URL}/describe`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(req),
   });
-  if (!res.ok) throw new Error(`vision analyze failed: ${res.status} ${await res.text()}`);
-  return (await res.json()) as VisionAnalyzeResponse;
+  if (!res.ok) throw new Error(`vision describe failed: ${res.status} ${await res.text()}`);
+  return (await res.json()) as VisionDescribeResponse;
 }
 
 /**
- * Wait for the Reel's caption (the server starts it when /analyze is uncertain).
- * Resolves to the caption, or null on failure/timeout — never throws.
+ * The Reel's description: what /describe returned if it was ready, otherwise
+ * poll for it. Resolves to the text, or null on failure/timeout — never throws.
  */
-export async function waitForCaption(
-  platform: string,
-  videoId: string,
+export async function describeAndWait(
+  req: VisionDescribeRequest,
   { timeoutMs = 20_000, intervalMs = 1000 } = {},
 ): Promise<string | null> {
+  const first = await describe(req);
+  if (first.captionStatus === "ready") return first.caption ?? null;
+  if (first.captionStatus !== "pending") return null;
+
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, intervalMs));
     try {
-      const res = await authedFetch(`${VISION_BASE_URL}/media/${platform}/${encodeURIComponent(videoId)}`);
+      const res = await authedFetch(`${VISION_BASE_URL}/media/${req.platform}/${encodeURIComponent(req.videoId)}`);
       if (!res.ok) return null;
       const media = (await res.json()) as VisionMediaResponse;
       if (media.captionStatus === "ready") return media.caption ?? null;
@@ -41,7 +45,6 @@ export async function waitForCaption(
     } catch {
       return null;
     }
-    await new Promise((r) => setTimeout(r, intervalMs));
   }
   return null;
 }
