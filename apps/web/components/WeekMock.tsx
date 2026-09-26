@@ -17,7 +17,14 @@ const TOP_N = 5;
 const WEEKDAY = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
 export function WeekMock() {
-  const week = buildMockWeek();
+  return <WeekView week={buildMockWeek()} note="from your phone" />;
+}
+
+/**
+ * The "Your week" panel for any Summary: the landing page's mock, or the
+ * dashboard's real week (summarizeDays over the synced daily totals).
+ */
+export function WeekView({ week, note }: { week: Summary; note: string }) {
   const first = week.days[0].date;
   const last = week.days[week.days.length - 1].date;
 
@@ -31,7 +38,7 @@ export function WeekMock() {
           </span>
         </p>
         <p className="font-mono text-[11px] text-faint">
-          {dayLabel(first)} – {dayLabel(last)} · stays on this phone
+          {dayLabel(first)} – {dayLabel(last)} · {note}
         </p>
       </header>
 

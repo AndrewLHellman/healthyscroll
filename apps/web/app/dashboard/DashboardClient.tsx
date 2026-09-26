@@ -2,12 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import type { PolicyRow, SkipRow } from "@healthyscroll/shared";
+import { summarizeDays, type FeedDayEntry, type FeedDayRow, type PolicyRow, type SkipRow } from "@healthyscroll/shared";
 import { supabase, useUser } from "@/lib/supabaseBrowser";
 import { signIn } from "@/app/AuthButton";
 import { MarkImage } from "@/components/Mark";
+import { WeekView } from "@/components/WeekMock";
 import { FeedStats } from "./FeedStats";
-import { computeStats, longDate, type ReelLite } from "./stats";
+import { computeStats, dayKey, entriesFromReels, entryFromRow, longDate, statsFromEntries, type ReelLite } from "./stats";
 import { buildSampleReels, SAMPLE_ALL_TIME, SAMPLE_PROMPT } from "./sample";
 
 const WINDOW_DAYS = 28;
@@ -62,12 +63,14 @@ function SignedOut() {
 }
 
 function SampleDashboard({ empty }: { empty: boolean }) {
-  const reels = useMemo(() => (empty ? [] : buildSampleReels()), [empty]);
+  // Same sample month for every figure, as the daily totals the extension would sync.
+  const entries = useMemo(() => (empty ? [] : entriesFromReels(buildSampleReels())), [empty]);
   return (
     <Dashboard
       prompt={empty ? "" : SAMPLE_PROMPT}
       updatedAt={empty ? null : new Date(Date.now() - 9 * 86_400_000).toISOString()}
-      reels={reels}
+      reels={[]}
+      entries={entries}
       allTime={empty ? 0 : SAMPLE_ALL_TIME}
       readOnly
     />
@@ -77,6 +80,7 @@ function SampleDashboard({ empty }: { empty: boolean }) {
 function LiveDashboard({ userId }: { userId: string }) {
   const [policy, setPolicy] = useState<Pick<PolicyRow, "prompt" | "updated_at"> | null | undefined>(undefined);
   const [reels, setReels] = useState<ReelLite[] | undefined>(undefined);
+  const [entries, setEntries] = useState<FeedDayEntry[] | undefined>(undefined);
   const [allTime, setAllTime] = useState<number | null>(null);
 
   useEffect(() => {
@@ -97,13 +101,21 @@ function LiveDashboard({ userId }: { userId: string }) {
       // Only skips are recorded server-side, so the feed is known one-sided
       // for now; the figures that need watched Reels stay hidden.
       .then(({ data }) => setReels((data ?? []).map((s) => ({ seen_at: s.skipped_at, skipped: true, seconds: 0 }))));
+    // Daily watch totals synced by the extension (background/sync.ts). If there are
+    // none yet (or the table is missing), the figures fall back to skips alone.
+    void supabase
+      .from("feed_days")
+      .select("day, category, seen, skipped, seconds, buckets")
+      .gte("day", dayKey(Date.now() - (WINDOW_DAYS - 1) * 86_400_000))
+      .returns<Pick<FeedDayRow, "day" | "category" | "seen" | "skipped" | "seconds" | "buckets">[]>()
+      .then(({ data }) => setEntries((data ?? []).map(entryFromRow)));
     void supabase
       .from("skips")
       .select("*", { count: "exact", head: true })
       .then(({ count, error }) => setAllTime(error ? null : (count ?? 0)));
   }, [userId]);
 
-  if (policy === undefined || reels === undefined) return <Shell />;
+  if (policy === undefined || reels === undefined || entries === undefined) return <Shell />;
 
   return (
     <Dashboard
@@ -111,6 +123,7 @@ function LiveDashboard({ userId }: { userId: string }) {
       prompt={policy?.prompt ?? ""}
       updatedAt={policy?.updated_at ?? null}
       reels={reels}
+      entries={entries}
       allTime={allTime}
     />
   );
@@ -123,17 +136,25 @@ function Dashboard({
   prompt,
   updatedAt,
   reels,
+  entries,
   allTime,
   readOnly = false,
 }: {
   userId?: string;
   prompt: string;
   updatedAt: string | null;
+  /** Skips only (from `skips`): the fallback when there are no daily totals. */
   reels: ReelLite[];
+  /** Daily watch totals (from `feed_days`, or the sample). */
+  entries: FeedDayEntry[];
   allTime: number | null;
   readOnly?: boolean;
 }) {
-  const stats = useMemo(() => computeStats(reels, { days: WINDOW_DAYS }), [reels]);
+  const stats = useMemo(
+    () => (entries.length ? statsFromEntries(entries, { days: WINDOW_DAYS }) : computeStats(reels, { days: WINDOW_DAYS })),
+    [entries, reels],
+  );
+  const week = useMemo(() => summarizeDays(entries, { days: 7 }), [entries]);
 
   return (
     <div className="flex flex-col">
@@ -164,6 +185,12 @@ function Dashboard({
           <PromptEditor key={prompt} userId={userId} initial={prompt} readOnly={readOnly} />
         </div>
       </section>
+
+      {week.watched > 0 && (
+        <section aria-label="Your week" className="border-t border-line py-14">
+          <WeekView week={week} note={readOnly ? "sample data" : "synced from your phone"} />
+        </section>
+      )}
 
       <section aria-labelledby="feed-heading" className="border-t border-line pt-14">
         <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">

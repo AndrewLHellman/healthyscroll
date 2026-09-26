@@ -15,7 +15,8 @@ const SHARE_DAYS = 14;
  * each column.
  */
 export function FeedStats({ stats, allTime }: { stats: Stats; allTime: number | null }) {
-  const empty = allTime === 0 || (allTime === null && stats.seen === 0);
+  // Empty only when nothing was seen or skipped: a week of watching with no skips still has figures.
+  const empty = stats.seen === 0 && !allTime;
 
   return (
     <div className="flex flex-col gap-14">

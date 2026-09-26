@@ -1,7 +1,8 @@
-import type { Decision, UserPolicy, VideoContext } from "@healthyscroll/shared";
+import { MIN_CATEGORY_PROBABILITY, type Decision, type UserPolicy, type VideoContext } from "@healthyscroll/shared";
 import { sendToTab, type ReelInfo } from "../lib/messages";
 import { evaluate } from "./jevClient";
 import { recordSkip } from "./sync";
+import { rememberCategory } from "./tally";
 import { analyze, waitForCaption } from "./visionClient";
 
 /**
@@ -114,13 +115,28 @@ function judge(info: ReelInfo, policy: UserPolicy, force = false): ReelRecord {
   return record;
 }
 
+/** Jev's category for the tally ("Your week"); a low-confidence guess counts as "other". */
+function noteCategory(code: string, decision: Decision): void {
+  const c = decision.category;
+  if (c) rememberCategory(code, c.probability >= MIN_CATEGORY_PROBABILITY ? c.label : "other");
+}
+
 async function decide(info: ReelInfo, context: VideoContext, policy: UserPolicy): Promise<Judgement> {
-  if (!policy.enabled || !policy.prompt.trim()) {
-    return { verdict: "allow", stage: "none", reason: "filter off or no policy" };
+  if (!policy.enabled) {
+    return { verdict: "allow", stage: "none", reason: "filter off" };
+  }
+  if (!policy.prompt.trim()) {
+    // Switched on with no prompt: nothing to skip, but still ask Jev what the Reel is
+    // about so "Your week" works. The server forces allow when there's no policy.
+    const d = await evaluate({ policy: { prompt: "" }, context });
+    noteCategory(info.code, d);
+    return { verdict: "allow", stage: "none", reason: "no policy (category only)" };
   }
 
   const hasMedia = Boolean(info.manifest || info.videoUrl);
   const textP = evaluate({ policy: { prompt: policy.prompt }, context });
+  // The category rides on the text pass; keep it whichever signal decides.
+  textP.then((d) => noteCategory(info.code, d), () => {});
   const visionP = hasMedia
     ? analyze({
         videoId: info.id,

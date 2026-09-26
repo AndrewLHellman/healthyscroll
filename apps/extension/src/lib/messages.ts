@@ -1,4 +1,4 @@
-import type { Decision, VideoContext } from "@healthyscroll/shared";
+import type { Decision, ReelView, VideoContext } from "@healthyscroll/shared";
 
 /**
  * Typed message contract between the content script (page side) and the
@@ -40,7 +40,12 @@ export type ContentToBackground =
   /** Instagram: Reels loaded into the page (usually ahead of the viewer). Judged immediately. */
   | { type: "REELS_DISCOVERED"; reels: ReelInfo[] }
   /** Instagram: this Reel (by shortcode) is now on screen. */
-  | { type: "REEL_ACTIVE"; code: string };
+  | { type: "REEL_ACTIVE"; code: string }
+  /**
+   * Instagram: time on screen for Reels the viewer has moved past, batched.
+   * `final` when the page is being hidden: sync now rather than on the throttle.
+   */
+  | { type: "REELS_WATCHED"; views: ReelView[]; final?: boolean };
 
 /** background → content */
 export type BackgroundToContent =

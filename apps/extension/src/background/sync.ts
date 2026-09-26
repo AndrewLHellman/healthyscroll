@@ -1,6 +1,7 @@
-import type { Decision, PolicyRow, UserPolicy, VideoContext } from "@healthyscroll/shared";
+import type { Decision, FeedDayRow, PolicyRow, UserPolicy, VideoContext } from "@healthyscroll/shared";
 import { getUserId, supabase } from "./auth";
 import { getPolicy, onPolicyChange, replacePolicy } from "./policyStore";
+import { getEntries } from "./tally";
 
 /**
  * Keeps the local policy (chrome.storage.sync, read by the pipeline) in step with
@@ -71,6 +72,45 @@ export async function recordSkip(context: VideoContext, decision: Decision): Pro
     violates_probability: decision.violatesProbability,
   });
   if (error) console.error("[sync] record skip failed", error);
+}
+
+const FEED_PUSH_EVERY_MS = 5 * 60_000;
+let lastFeedPushAt = 0;
+
+/**
+ * Send the watch tally's daily totals to `feed_days` for the dashboard's
+ * "Your week". Throttled, except `now` (the page was just hidden: the viewer
+ * may be heading to the dashboard). Today and yesterday only, since those are
+ * the only days a batch can change. Absolute totals, so repeats are harmless.
+ */
+export function maybePushFeed(now = false): void {
+  if (!now && Date.now() - lastFeedPushAt < FEED_PUSH_EVERY_MS) return;
+  lastFeedPushAt = Date.now();
+  void pushFeed();
+}
+
+async function pushFeed(): Promise<void> {
+  const userId = await getUserId();
+  if (!userId) return;
+  const entries = await getEntries(2);
+  if (!entries.length) return;
+  const updatedAt = new Date().toISOString();
+  const { error } = await supabase.from("feed_days").upsert(
+    entries.map(
+      ({ date, category, totals }): FeedDayRow => ({
+        user_id: userId,
+        day: date,
+        category,
+        seen: totals.seen,
+        skipped: totals.skipped,
+        seconds: totals.seconds,
+        buckets: totals.buckets,
+        updated_at: updatedAt,
+      }),
+    ),
+    { onConflict: "user_id,day,category" },
+  );
+  if (error) console.error("[sync] push feed failed", error);
 }
 
 /** Push local edits (popup Save) to Supabase. */

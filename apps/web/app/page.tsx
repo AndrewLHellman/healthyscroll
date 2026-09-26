@@ -94,7 +94,7 @@ function Week() {
         <SectionHeading
           eyebrow="Your week"
           title="Get to know your scrolling habits."
-          body="See which topics take up your time and which ones you tend to linger on. Your weekly summary can help you decide whether your feed is how you want to spend that time, and what you’d like to change. This record stays on your phone."
+          body="See which topics take up your time and which ones you tend to linger on. Your weekly summary can help you decide whether your feed is how you want to spend that time, and what you’d like to change. Only daily totals per topic leave your phone, and only if you sign in."
         />
         <div className="mt-12">
           <WeekMock />
@@ -132,11 +132,11 @@ const FAQ = [
   },
   {
     q: "Where does my data go?",
-    a: "Your prompt, captions, and comments are sent to our server for evaluation. Captions and comments aren’t stored. If a video frame is needed, the server describes it and discards the image. Signing in saves your prompt and a skip log for your dashboard. Your watch-time record stays on your phone.",
+    a: "Your prompt, captions, and comments are sent to our server for evaluation. Captions and comments aren’t stored. If a video frame is needed, the server describes it and discards the image. Signing in saves your prompt, a skip log, and daily totals per topic (how many Reels, how long) for your dashboard. Which Reels you watched never leaves your phone.",
   },
   {
     q: "What does the weekly summary track?",
-    a: "Each Reel’s category, how long it was on screen, and whether it was skipped. The summary groups videos into topics such as “relationships & drama”. It doesn’t record creators or likes.",
+    a: "For each day and topic, such as “relationships & drama”: how many Reels came on screen, how many were skipped, and how long you watched the rest. It doesn’t keep which Reels, creators, or likes.",
   },
   {
     q: "What does it cost?",
