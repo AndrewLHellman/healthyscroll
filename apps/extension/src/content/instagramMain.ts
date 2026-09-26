@@ -171,9 +171,12 @@ chrome.runtime.onMessage.addListener((msg: BackgroundToContent) => {
 
 if (DEBUG) {
   window.addEventListener("hs:probe", () => console.log("[healthyscroll] probe", probe()));
+  // Skip the Reel on screen without Jev; counted in the tally like a real skip.
   window.addEventListener("hs:skip", () => {
     const code = getActiveReelCode();
-    if (code) void skipReel(code).then((how) => console.log("[healthyscroll] test skip:", how));
+    if (!code) return;
+    if (view?.code === code) view.skipped = true;
+    void skipReel(code).then((how) => console.log("[healthyscroll] test skip:", how));
   });
   // Today's watch totals on this device, plus views not yet sent to background.
   window.addEventListener("hs:tally", () => {
