@@ -1,15 +1,39 @@
 import type { Metadata } from "next";
+import { Bricolage_Grotesque, Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
+const display = Bricolage_Grotesque({
+  subsets: ["latin"],
+  variable: "--font-display",
+  axes: ["wdth", "opsz"],
+});
+
+const sans = Geist({
+  subsets: ["latin"],
+  variable: "--font-sans",
+});
+
+const mono = Geist_Mono({
+  subsets: ["latin"],
+  variable: "--font-mono",
+});
+
 export const metadata: Metadata = {
-  title: "Healthy Scroll",
-  description: "Your prompt, your feed. Skip the videos that don't align with your goals.",
+  title: "Healthy Scroll — your prompt, your feed",
+  description:
+    "A Chrome extension that skips the videos you asked not to see, before they get a chance to hook you. Decisions in about 200 ms. Frames never leave your laptop.",
+  metadataBase: new URL("https://healthyscroll.net"),
+  openGraph: {
+    title: "Healthy Scroll",
+    description: "Skip the videos you never wanted to see. Before they hook you.",
+    type: "website",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body className="min-h-screen bg-white text-neutral-900 antialiased">{children}</body>
+    <html lang="en" className={`${display.variable} ${sans.variable} ${mono.variable}`}>
+      <body className="min-h-screen bg-paper text-ink antialiased">{children}</body>
     </html>
   );
 }

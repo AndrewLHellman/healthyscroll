@@ -22,7 +22,8 @@ const frameSchema = z.object({
 });
 
 const bodySchema = z.object({
-  policy: z.object({ prompt: z.string().min(1).max(2000) }),
+  // Empty prompt is allowed: the extension still asks for the category (tally-only mode).
+  policy: z.object({ prompt: z.string().max(2000) }),
   context: z.object({
     videoId: z.string(),
     platform: z.literal("tiktok"),

@@ -23,8 +23,10 @@ Status as of 2026-09-26: **TikTok adapter verified on the live For You page** (s
 
 ## Phase 3 — polish for demo
 
-- [ ] Landing page design pass (`apps/web/app/page.tsx`). Keep it one screen.
+- [x] Landing page design pass (`apps/web/app/page.tsx`).
+- [ ] Turn on live Jev in the prompt playground: set `NEXT_PUBLIC_PLAYGROUND_SCORER=jev` once `AI_GATEWAY_API_KEY` is in place, check the 8 mock clips score sensibly for each preset, and tune the canned captions/hashtags in `lib/playground/clips.ts` if any preset misfires. (The route now requires a Supabase bearer token, so the playground scorer needs a signed-in session or a separate unauthenticated, rate-limited path.)
 - [x] Sync policy between healthyscroll.net and the extension — via the Supabase `policies` table (`background/sync.ts`), newest `updated_at` wins.
+- [ ] Observability ("your week"): category question + on-device ledger + insights page are scaffolded (`shared/categories.ts`, `shared/insights.ts`, `background/ledger.ts`, `src/insights/`) but unverified — see docs/OBSERVABILITY.md once written. Landing page first.
 - [ ] Deploy web to Vercel; point extension prod `API_BASE_URL` at it.
 - [ ] Pack the extension.
 

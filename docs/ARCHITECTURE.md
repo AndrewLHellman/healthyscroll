@@ -64,7 +64,9 @@ healthyscroll/
 - CORS open to `*` because the caller is a `chrome-extension://` origin.
 
 ### Web landing (`apps/web/app/page.tsx`)
-- Marketing + the same textarea. Currently read-only; wiring it to the extension needs `externally_connectable` (see ROADMAP).
+- Landing page modelled on tsenta.com: hero → animated pipeline trace (`components/PipelineDemo.tsx`) → 3-stage how-it-works → prompt playground → "Your week" observability mock (`components/WeekMock.tsx`, fed by a seeded fake week in `lib/mockWeek.ts` run through the real `summarize()`) → open FAQ (privacy lives here now) → popup mock + signed-in saved prompt (`app/Dashboard.tsx`) CTA → footer. Google sign-in is `app/AuthButton.tsx` in the nav. Design tokens live in `app/globals.css` (`@theme`); fonts (Bricolage Grotesque / Geist / Geist Mono) in `app/layout.tsx`.
+- Prompt playground (`components/PromptPlayground.tsx`) re-scores a mock feed of 8 clips as the prompt changes. Scoring is behind a `Scorer` interface in `lib/playground/scorers.ts`: `keywordScorer` (default, in-browser) or `jevScorer`, which posts each clip through `/api/evaluate` with its `VideoContext` + a canned Moondream caption (`lib/playground/clips.ts`). Enable with `NEXT_PUBLIC_PLAYGROUND_SCORER=jev`. Verdicts use `toVerdict()` from shared, so the page and the extension agree on what "skip" means.
+- The "try writing yours" textarea is not wired to the extension yet; that needs `externally_connectable` (see ROADMAP). "Add to Chrome" links are `#` placeholders until the extension is published.
 
 ## Data flow
 

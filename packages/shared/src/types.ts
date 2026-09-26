@@ -1,3 +1,5 @@
+import type { Category } from "./categories";
+
 /**
  * Shared domain types for Healthy Scroll.
  * Used by the extension (producer of VideoContext, consumer of Decision)
@@ -57,8 +59,33 @@ export interface Decision {
   verdict: Verdict;
   /** Jev's probability that the video violates the policy, 0..1. */
   violatesProbability: number;
+  /**
+   * What the video is about, from the same Jev call. Independent of the policy.
+   * Absent only if the model didn't answer the question.
+   */
+  category?: { label: Category; probability: number };
   /** Which stage produced this decision. */
   stage: "text" | "visual" | "monitor";
   /** Wall-clock ms spent inside Jev for observability. */
   latencyMs: number;
+}
+
+/**
+ * One row in the on-device tally: a video the user was shown, how long they
+ * stayed, and what it was. Lives in chrome.storage.local, never sent anywhere.
+ * No description or captions are kept — just enough to draw the charts.
+ */
+export interface WatchRecord {
+  videoId: string;
+  author?: string;
+  /** Epoch ms when the video came into view. */
+  startedAt: number;
+  /** Time the video was actually on screen (tab visible), ms. */
+  dwellMs: number;
+  category?: Category;
+  categoryP?: number;
+  /** Last verdict the pipeline reached for it, if Jev was asked. */
+  verdict?: Verdict;
+  /** True if Healthy Scroll skipped it (as opposed to the user scrolling on). */
+  skipped: boolean;
 }

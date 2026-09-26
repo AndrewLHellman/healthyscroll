@@ -8,9 +8,10 @@ const PLACEHOLDER =
   "e.g. gambling, drinking, thirst-trap content, anything that makes me feel worse about myself";
 
 /**
- * Signed out: a read-only preview of the prompt box.
  * Signed in: the user's saved prompt (editable; the extension pulls it on its
  * next sync) and how many videos the extension has skipped for them.
+ * Signed out: nothing — the prompt playground above already shows the box,
+ * and the nav has the sign-in link.
  */
 export function Dashboard() {
   const user = useUser();
@@ -42,37 +43,22 @@ export function Dashboard() {
     if (!error) setTimeout(() => setStatus("idle"), 1200);
   };
 
-  if (!user) {
-    return (
-      <label className="flex flex-col gap-2">
-        <span className="text-xs text-neutral-500">Skip anything that's…</span>
-        <textarea
-          className="min-h-32 resize-none rounded-xl border border-neutral-200 p-4 text-sm leading-relaxed outline-none"
-          placeholder={PLACEHOLDER}
-          readOnly
-        />
-        {user === null && (
-          <span className="text-xs text-neutral-400">Sign in to save this and see your stats.</span>
-        )}
-      </label>
-    );
-  }
+  if (!user) return null;
 
   return (
-    <section className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <span className="text-4xl font-semibold tabular-nums tracking-tight">
-          {skipCount === null ? "–" : skipCount.toLocaleString()}
-        </span>
-        <span className="text-sm text-neutral-500">
-          {skipCount === 1 ? "video skipped" : "videos skipped"} for you so far
-        </span>
+    <section className="mt-12 flex flex-col gap-5 border-t border-line pt-8" aria-label="Your prompt">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <p className="text-xs font-medium uppercase tracking-wider text-faint">Your prompt</p>
+        <p className="font-mono text-[11px] text-faint">
+          {skipCount === null ? "–" : skipCount.toLocaleString()} {skipCount === 1 ? "video" : "videos"} skipped for
+          you so far
+        </p>
       </div>
 
-      <label className="flex flex-col gap-2">
-        <span className="text-xs text-neutral-500">Skip anything that's…</span>
+      <label className="flex flex-col gap-1.5">
+        <span className="text-xs text-muted">Skip anything that’s…</span>
         <textarea
-          className="min-h-32 resize-none rounded-xl border border-neutral-200 p-4 text-sm leading-relaxed outline-none focus:border-neutral-400"
+          className="min-h-28 resize-none rounded-lg border border-line bg-paper p-3 text-sm leading-relaxed outline-none transition-colors focus:border-ink"
           placeholder={PLACEHOLDER}
           maxLength={2000}
           value={prompt}
@@ -80,15 +66,21 @@ export function Dashboard() {
         />
       </label>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-4">
         <button
           onClick={() => void save()}
           disabled={status === "saving"}
-          className="rounded-lg border border-neutral-200 px-4 py-2 text-sm hover:border-neutral-400 disabled:opacity-60"
+          className="rounded-full bg-ink px-5 py-2 text-sm font-medium text-paper transition-colors hover:bg-ink/85 disabled:opacity-60"
         >
           {status === "saving" ? "Saving…" : status === "saved" ? "Saved" : "Save"}
         </button>
-        {status === "error" && <span className="text-xs text-red-600">Couldn't save. Try again.</span>}
+        <span className="text-xs text-faint">
+          {status === "error" ? (
+            <span className="text-skip">Couldn’t save. Try again.</span>
+          ) : (
+            "The extension picks this up on its next sync."
+          )}
+        </span>
       </div>
     </section>
   );
