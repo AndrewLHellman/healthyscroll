@@ -18,15 +18,18 @@ COPY requirements.txt ./
 RUN pip install torch --index-url https://download.pytorch.org/whl/cpu \
     && pip install -r requirements.txt "transformers>=4.57"
 
-# Download the scorer once, at build time, into HF_HOME.
+# Download the scorer once, at build time, into HF_HOME (~1.5 GB: 375M params
+# in fp32). Read-only at runtime, hence offline mode below; no chown, which
+# would duplicate the layer.
 RUN python -c "from transformers import AutoModel, AutoProcessor; \
     AutoProcessor.from_pretrained('google/siglip2-base-patch16-224'); \
     AutoModel.from_pretrained('google/siglip2-base-patch16-224')"
 
 COPY vision ./vision
 
-RUN useradd -r -u 10001 app && chown -R app:app /models
+RUN useradd -r -u 10001 app
 USER app
+ENV HF_HUB_OFFLINE=1
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4)"

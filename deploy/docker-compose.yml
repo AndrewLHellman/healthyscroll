@@ -22,4 +22,5 @@ services:
       VISION_QUANTIZE: "false"
     ports:
       - "127.0.0.1:8000:8000"
-    mem_limit: 3g
+    # SigLIP 2 base is 375M params in fp32 (~1.5 GB) plus the frame cache.
+    mem_limit: 4g
