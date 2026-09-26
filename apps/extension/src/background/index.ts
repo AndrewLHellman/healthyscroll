@@ -16,6 +16,9 @@ import { maybePullPolicy, pullPolicy, startPolicySync } from "./sync";
  * logic lives in orchestrator.ts / auth.ts / sync.ts.
  */
 
+const DEBUG = import.meta.env.VITE_HS_DEBUG === "true";
+if (DEBUG) console.log("[background] started", new Date().toISOString());
+
 startPolicySync();
 
 /** Best-effort: the popup should still open if Supabase is unreachable. */
@@ -52,13 +55,20 @@ chrome.runtime.onMessage.addListener((msg: ContentToBackground | PopupToBackgrou
     return true; // keep the channel open for the async reply
   }
 
+  if (DEBUG) console.log("[background] message", msg.type, "from tab", sender.tab?.id);
+
+  // Safari may leave out sender.tab fields; only TikTok's frame capture needs windowId.
   const tabId = sender.tab?.id;
   const windowId = sender.tab?.windowId;
-  if (tabId === undefined || windowId === undefined) return;
+  if (tabId === undefined) {
+    console.warn("[background] dropped message with no sender tab", msg.type, sender);
+    return;
+  }
 
   switch (msg.type) {
     case "VIDEO_CHANGED":
     case "VIDEO_CONTEXT_UPDATED":
+      if (windowId === undefined) return;
       // An update restarts the pipeline for the same video, now with comments.
       // Website edits land on the next video (pull is throttled and async).
       maybePullPolicy();

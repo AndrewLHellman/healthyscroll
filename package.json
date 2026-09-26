@@ -9,8 +9,10 @@
   },
   "scripts": {
     "dev:extension": "pnpm --filter @healthyscroll/extension dev",
+    "dev:safari": "pnpm --filter @healthyscroll/extension dev:safari",
     "dev:web": "pnpm --filter @healthyscroll/web dev",
     "build": "pnpm -r build",
+    "build:safari": "pnpm --filter @healthyscroll/extension build:safari",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint"
   },

@@ -1,0 +1,86 @@
+* {
+    -webkit-user-select: none;
+    -webkit-user-drag: none;
+    cursor: default;
+    box-sizing: border-box;
+}
+
+:root {
+    color-scheme: light dark;
+
+    --spacing: 20px;
+    --ink: #111;
+    --paper: #fff;
+    --muted: #6b6b6b;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ink: #f2f2f2;
+        --paper: #111;
+        --muted: #9a9a9a;
+    }
+}
+
+html {
+    height: 100%;
+}
+
+body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+
+    gap: calc(var(--spacing) * 0.75);
+    margin: 0 calc(var(--spacing) * 1.5);
+    height: 100%;
+
+    font: -apple-system-body;
+    color: var(--ink);
+    background: var(--paper);
+    text-align: center;
+}
+
+h1 {
+    margin: 0;
+    font: -apple-system-title1;
+    font-weight: 700;
+}
+
+.lede {
+    margin: 0;
+    color: var(--muted);
+}
+
+ol {
+    margin: 0;
+    padding-left: 1.4em;
+    text-align: left;
+    line-height: 1.4;
+}
+
+li + li {
+    margin-top: 0.5em;
+}
+
+.button {
+    display: block;
+    width: 100%;
+    padding: 14px;
+    border: 2px solid var(--ink);
+    color: var(--ink);
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.button.primary {
+    background: var(--ink);
+    color: var(--paper);
+}
+
+/* iOS data detectors turn the domain names in the steps into links; keep them as text. */
+a[x-apple-data-detectors] {
+    color: inherit;
+    text-decoration: none;
+}

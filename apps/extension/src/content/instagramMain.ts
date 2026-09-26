@@ -29,12 +29,14 @@ let alive = true;
 function send(msg: ContentToBackground): void {
   // After the extension reloads, this copy is orphaned: go quiet (reload the tab for a fresh one).
   if (!chrome.runtime?.id) {
+    log("not sending: chrome.runtime.id is gone (orphaned?)", msg.type);
     alive = false;
     return;
   }
   try {
     sendToBackground(msg).catch((err) => log("send failed", err));
-  } catch {
+  } catch (err) {
+    log("send threw; going quiet", msg.type, err);
     alive = false;
   }
 }
