@@ -4,6 +4,7 @@ import { PipelineDemo } from "@/components/PipelineDemo";
 import { PromptPlayground } from "@/components/PromptPlayground";
 import { WeekMock } from "@/components/WeekMock";
 import { PopupMock } from "@/components/PopupMock";
+import { PixelHeart } from "@/components/Mark";
 import { Dashboard } from "./Dashboard";
 
 export default function Home() {
@@ -30,7 +31,7 @@ function Hero() {
     <section className="mx-auto max-w-6xl px-5 pb-16 pt-16 sm:px-8 sm:pt-24">
       <div className="max-w-3xl">
         <p className="inline-flex items-center gap-2 rounded-full border border-line px-3 py-1 text-xs text-muted">
-          <span className="h-1.5 w-1.5 rounded-full bg-accent" aria-hidden />
+          <PixelHeart size={9} />
           TigerHacks 2026 · Health track
         </p>
         <h1 className="mt-6 font-display text-[2.6rem] font-semibold leading-[1.02] tracking-[-0.03em] sm:text-6xl">

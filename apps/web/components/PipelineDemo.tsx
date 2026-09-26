@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Footage } from "./Footage";
+import { PixelHeart } from "./Mark";
 
 /**
  * Looping, scripted trace of the real pipeline: a mock feed card on the left,
@@ -204,8 +205,8 @@ function FeedCard({
           </p>
         </div>
         <div className="absolute right-3 top-1/2 flex -translate-y-1/2 flex-col gap-4 text-white/85" aria-hidden>
-          {["♥", "💬", "↗"].map((g) => (
-            <span key={g} className="grid h-8 w-8 place-items-center rounded-full bg-white/15 text-sm backdrop-blur">
+          {[<PixelHeart key="h" size={18} color="#fff" />, "💬", "↗"].map((g, k) => (
+            <span key={k} className="grid h-8 w-8 place-items-center rounded-full bg-white/15 text-sm backdrop-blur">
               {g}
             </span>
           ))}
@@ -271,19 +272,24 @@ function Trace({ lines, clip }: { lines: Line[]; clip: Clip }) {
   );
 }
 
+const CELLS = 10;
+
 function Meter({ p, verdict, ms }: { p: number; verdict: Verdict; ms?: number }) {
   const color = verdict === "skip" ? "bg-skip" : verdict === "keep" ? "bg-keep" : "bg-faint";
   const textColor = verdict === "skip" ? "text-skip" : verdict === "keep" ? "text-keep" : "text-muted";
+  const lit = Math.round(p * CELLS);
   return (
     <div className="mt-2 flex items-center gap-3">
-      <div className="relative h-1.5 flex-1 rounded-full bg-mist">
-        {/* Threshold ticks: below 0.2 keep, above 0.8 skip, between → look closer. */}
-        <span className="absolute left-[20%] top-1/2 h-3 w-px -translate-y-1/2 bg-line" aria-hidden />
-        <span className="absolute left-[80%] top-1/2 h-3 w-px -translate-y-1/2 bg-line" aria-hidden />
-        <span
-          className={`absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full ${color} transition-[left] duration-500`}
-          style={{ left: `${p * 100}%` }}
-        />
+      {/* Ten cells, like a health bar. Cells 1–2 are "keep", 9–10 are "skip", the middle is "look closer". */}
+      <div className="flex flex-1 gap-px" aria-hidden>
+        {Array.from({ length: CELLS }, (_, k) => (
+          <span
+            key={k}
+            className={`h-2 flex-1 transition-colors duration-300 ${k < lit ? color : "bg-mist"} ${
+              k === 2 || k === 8 ? "ml-1" : ""
+            }`}
+          />
+        ))}
       </div>
       <span className="w-10 text-right tabular-nums text-ink">{p.toFixed(2)}</span>
       <span className={`w-20 whitespace-nowrap ${textColor}`}>{verdict === "look" ? "look closer" : verdict}</span>

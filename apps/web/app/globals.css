@@ -7,9 +7,9 @@
   --color-ink: #12141a;
   --color-muted: #6c727f;
   --color-faint: #9aa0ab;
-  --color-accent: #2f5bff;
-  --color-accent-ink: #1f3fd6;
-  /* Semantic pair. Used only inside the pipeline demo, never for UI chrome. */
+  --color-accent: #12141a;
+  --color-accent-ink: #2b2f3a;
+  /* Semantic pair. skip doubles as the brand red (the heart in the mark). */
   --color-skip: #e5484d;
   --color-keep: #2f9e62;
 

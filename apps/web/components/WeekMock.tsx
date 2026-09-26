@@ -137,11 +137,11 @@ function Holds({ week }: { week: Summary }) {
             <li key={h.category} className="grid grid-cols-[minmax(0,9.5rem)_1fr_auto] items-center gap-3 text-sm">
               <span className="truncate">{CATEGORY_LABELS[h.category]}</span>
               <div className="relative h-1.5 rounded-full bg-mist">
-                {/* Ink up to your average; the accent part is the extra hold past it. */}
+                {/* Ink up to your average; the red part is the extra hold past it. */}
                 <div className="absolute inset-y-0 left-0 rounded-full bg-ink" style={{ width: `${Math.min(width, tick)}%` }} />
                 {over && (
                   <div
-                    className="absolute inset-y-0 rounded-r-full bg-accent"
+                    className="absolute inset-y-0 rounded-r-full bg-skip"
                     style={{ left: `${tick}%`, width: `${width - tick}%` }}
                   />
                 )}
@@ -152,7 +152,7 @@ function Holds({ week }: { week: Summary }) {
                 />
               </div>
               <span className="font-mono text-[11px] tabular-nums text-muted">
-                <span className={over ? "text-accent-ink" : "text-ink"}>{h.ratio.toFixed(1)}×</span>
+                <span className={over ? "text-skip" : "text-ink"}>{h.ratio.toFixed(1)}×</span>
                 <span className="hidden sm:inline"> · {formatDuration(h.avgMs)}</span>
               </span>
             </li>
@@ -164,7 +164,7 @@ function Holds({ week }: { week: Summary }) {
         <p className="border-t border-line pt-4 text-[15px] leading-relaxed text-muted">
           <span className="text-ink">{cap(CATEGORY_LABELS[top.category])}</span> is{" "}
           <span className="text-ink">{pct(countShare)}</span> of what you scrolled past and{" "}
-          <span className="text-accent-ink">{pct(topTotal.share)}</span> of your time.
+          <span className="text-skip">{pct(topTotal.share)}</span> of your time.
         </p>
       )}
     </div>

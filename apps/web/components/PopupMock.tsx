@@ -2,20 +2,15 @@
  * A faithful, static rendering of the extension popup — the entire UI.
  * Mirrors apps/extension/src/popup/Popup.tsx; if that changes, change this.
  */
+import { Mark } from "./Mark";
+
 export function PopupMock() {
   return (
     <div className="relative">
       {/* Browser toolbar fragment, so it reads as a popup and not a form. */}
       <div className="flex items-center justify-end gap-3 rounded-t-xl border border-b-0 border-line bg-mist px-3 py-2">
         <span className="h-2 w-24 rounded-full bg-line" aria-hidden />
-        <span className="grid h-5 w-5 place-items-center rounded-md bg-ink text-paper" aria-hidden>
-          <svg width="10" height="10" viewBox="0 0 18 18" fill="none">
-            <rect x="2" y="1" width="14" height="4" rx="1.5" fill="currentColor" />
-            <rect x="2" y="7" width="14" height="4" rx="1.5" fill="currentColor" opacity="0.28" />
-            <path d="M3 9h12" stroke="#e5484d" strokeWidth="1.8" strokeLinecap="round" />
-            <rect x="2" y="13" width="14" height="4" rx="1.5" fill="currentColor" />
-          </svg>
-        </span>
+        <Mark height={14} className="text-ink" />
       </div>
 
       <div className="w-[320px] rounded-b-xl border border-line bg-paper p-5 shadow-[0_24px_60px_-24px_rgba(18,20,26,0.35)]">
