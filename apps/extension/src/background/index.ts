@@ -8,11 +8,13 @@ import { getPolicy } from "./policyStore";
 import { cancel, onVideoChanged } from "./orchestrator";
 import { getAuthState, signIn, signOut } from "./auth";
 import { maybePullPolicy, pullPolicy, startPolicySync } from "./sync";
+import * as ledger from "./ledger";
 
 /**
  * Background service worker entry. Routes messages from content scripts into
- * the orchestrator, and popup auth requests into auth.ts. Keep this file thin;
- * logic lives in orchestrator.ts / auth.ts / sync.ts.
+ * the orchestrator (decisions) and the ledger (the tally), and popup auth
+ * requests into auth.ts. Keep this file thin; logic lives in
+ * orchestrator.ts / ledger.ts / auth.ts / sync.ts.
  */
 
 startPolicySync();
@@ -57,16 +59,29 @@ chrome.runtime.onMessage.addListener((msg: ContentToBackground | PopupToBackgrou
 
   switch (msg.type) {
     case "VIDEO_CHANGED":
+      ledger.openWatch(tabId, msg.context);
+      maybePullPolicy();
+      void getPolicy().then((policy) => onVideoChanged(tabId, windowId, msg.context, policy));
+      break;
     case "VIDEO_CONTEXT_UPDATED":
-      // An update restarts the pipeline for the same video, now with comments.
+      // An update restarts the pipeline for the same video, now with comments. Same watch record.
       // Website edits land on the next video (pull is throttled and async).
       maybePullPolicy();
       void getPolicy().then((policy) => onVideoChanged(tabId, windowId, msg.context, policy));
       break;
     case "VIDEO_ENDED":
       cancel(tabId);
+      void ledger.closeWatch(tabId);
+      break;
+    case "VISIBILITY_CHANGED":
+      ledger.setVisible(tabId, msg.visible);
       break;
   }
 });
 
-chrome.tabs.onRemoved.addListener((tabId) => cancel(tabId));
+chrome.tabs.onRemoved.addListener((tabId) => {
+  cancel(tabId);
+  void ledger.closeWatch(tabId);
+});
+
+void ledger.prune();

@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
-import type { UserPolicy } from "@healthyscroll/shared";
+import { CATEGORY_LABELS, formatDuration, summarize, type Summary, type UserPolicy } from "@healthyscroll/shared";
 import { getPolicy, setPolicy } from "../background/policyStore";
+import { getRecords } from "../background/ledger";
 import { sendAuthMessage, type AuthState, type PopupToBackground } from "../lib/messages";
 
 /**
- * The whole UI: one switch, one text box. Deliberately minimal.
+ * The whole UI: one switch, one text box — plus one line about today that
+ * opens the insights page. Deliberately minimal.
  * The policy is synced to Supabase by the background worker (background/sync.ts),
  * so it's also editable on the website.
  */
@@ -14,9 +16,11 @@ export function Popup() {
   const [auth, setAuth] = useState<AuthState | null>(null);
   const [authBusy, setAuthBusy] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [today, setToday] = useState<Summary | null>(null);
 
   useEffect(() => {
     void runAuth({ type: "AUTH_GET" });
+    void getRecords(1).then((rs) => setToday(summarize(rs, { days: 1 })));
   }, []);
 
   // Sign-in runs in the background worker; if the popup closes mid-flow it
@@ -94,8 +98,11 @@ export function Popup() {
         {saved ? "Saved" : "Save"}
       </button>
 
+      <TodayLine summary={today} />
+
       <p className="text-[11px] text-neutral-400 leading-snug">
         Video frames are analysed on your device. Only text and short captions leave your machine.
+        Your tally stays in this browser.
       </p>
 
       <footer className="flex items-center justify-between gap-2 text-[11px] text-neutral-400">
@@ -109,5 +116,27 @@ export function Popup() {
         </button>
       </footer>
     </main>
+  );
+}
+
+/** "today · 42m · 31 skipped · mostly comedy, food →" — or nothing, if nothing yet. */
+function TodayLine({ summary }: { summary: Summary | null }) {
+  if (!summary || (summary.watched === 0 && summary.skipped.count === 0)) return null;
+  const top = summary.byCategory.slice(0, 2).map((c) => CATEGORY_LABELS[c.category]);
+  const parts = [
+    "today",
+    formatDuration(summary.totalMs),
+    summary.skipped.count ? `${summary.skipped.count} skipped` : null,
+    top.length ? `mostly ${top.join(", ")}` : null,
+  ].filter(Boolean);
+  return (
+    <button
+      type="button"
+      onClick={() => chrome.runtime.openOptionsPage()}
+      className="flex items-center justify-between gap-3 rounded-md text-left font-mono text-[11px] text-neutral-500 hover:text-neutral-900 transition-colors"
+    >
+      <span className="truncate">{parts.join(" · ")}</span>
+      <span aria-hidden>→</span>
+    </button>
   );
 }

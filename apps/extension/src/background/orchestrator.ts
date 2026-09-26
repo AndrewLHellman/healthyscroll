@@ -8,6 +8,7 @@ import {
 } from "@healthyscroll/shared";
 import { evaluate } from "./jevClient";
 import * as moondream from "./moondreamClient";
+import * as ledger from "./ledger";
 import { captureFrame } from "./frameCapture";
 import { sendToTab } from "../lib/messages";
 import { recordSkip } from "./sync";
@@ -19,6 +20,10 @@ import { recordSkip } from "./sync";
  *   2. visual pass   — if uncertain: capture frame → Moondream caption → Jev again.
  *   3. monitor       — while the video plays: repeat (2) every MONITOR_INTERVAL_MS,
  *                      up to MAX_FRAMES_PER_VIDEO, so mid-video changes still get caught.
+ *
+ * Every Jev response also carries the video's category, which goes to the
+ * ledger. With the switch on but no prompt written, only the text pass runs —
+ * enough for the tally — and nothing is ever skipped.
  *
  * One Session per tab. A new VIDEO_CHANGED cancels the previous session.
  */
@@ -42,7 +47,8 @@ export async function onVideoChanged(
   policy: UserPolicy,
 ): Promise<void> {
   cancel(tabId);
-  if (!policy.enabled || !policy.prompt.trim()) return;
+  if (!policy.enabled) return;
+  const hasPolicy = policy.prompt.trim().length > 0;
 
   const session: Session = {
     tabId,
@@ -55,10 +61,13 @@ export async function onVideoChanged(
   };
   sessions.set(tabId, session);
 
-  // Stage 1 — fast text-only decision.
+  // Stage 1 — fast text-only decision (and the category, for the tally).
   const textDecision = await runJev(session, "text");
   if (session.cancelled) return;
   if (await applyDecision(session, textDecision)) return;
+
+  // No prompt: nothing to look closer for. The text pass already tagged it.
+  if (!hasPolicy) return;
 
   // Stage 2/3 — visual pass now, then keep monitoring while it plays.
   if (!(await moondream.isAvailable())) {
@@ -114,6 +123,9 @@ async function runJev(session: Session, stage: Decision["stage"]): Promise<Decis
 
 /** Sends the decision to the tab. Returns true if the session is finished (skipped or confidently allowed w/o vision). */
 async function applyDecision(session: Session, decision: Decision): Promise<boolean> {
+  // Record what we learned regardless of verdict. Never blocks the skip.
+  void ledger.annotate(session.tabId, decision).catch(() => {});
+
   if (decision.verdict === "skip") {
     await sendToTab(session.tabId, { type: "SKIP_VIDEO", videoId: session.context.videoId, decision });
     cancel(session.tabId);

@@ -11,7 +11,9 @@ export type ContentToBackground =
   | { type: "VIDEO_CHANGED"; context: VideoContext }
   /** Same video, richer context (comments finished loading). Background re-runs the pipeline. */
   | { type: "VIDEO_CONTEXT_UPDATED"; context: VideoContext }
-  | { type: "VIDEO_ENDED"; videoId: string };
+  | { type: "VIDEO_ENDED"; videoId: string }
+  /** Tab shown/hidden. Only used to pause the dwell clock in the tally. */
+  | { type: "VISIBILITY_CHANGED"; visible: boolean };
 
 /** background → content */
 export type BackgroundToContent =

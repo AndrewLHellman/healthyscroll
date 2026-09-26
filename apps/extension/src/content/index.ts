@@ -7,6 +7,7 @@ import { getActiveItem, getVideoId, probe, scrapeContext, skipToNext } from "./t
  *
  * Responsibilities — and nothing more:
  *   - notice when the active video changes and send its text context to background
+ *   - report when the tab is hidden/shown, so the tally only counts visible time
  *   - perform the skip when background says so
  *
  * All judgement (Jev / Moondream) happens in the background worker.
@@ -105,6 +106,13 @@ function schedule(): void {
 function start(): void {
   observer.observe(document.body, { childList: true, subtree: true });
   document.addEventListener("scroll", schedule, { passive: true, capture: true });
+  document.addEventListener("visibilitychange", () =>
+    send({ type: "VISIBILITY_CHANGED", visible: document.visibilityState === "visible" }),
+  );
+  // Leaving the page (close, navigate away) ends the current video's clock.
+  window.addEventListener("pagehide", () => {
+    if (currentVideoId) send({ type: "VIDEO_ENDED", videoId: currentVideoId });
+  });
   schedule();
 }
 

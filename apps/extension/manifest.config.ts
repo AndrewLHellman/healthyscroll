@@ -17,6 +17,11 @@ export default defineManifest({
     default_popup: "src/popup/index.html",
     default_title: "Healthy Scroll",
   },
+  // "Your week" — the on-device tally. Opened from the popup via openOptionsPage().
+  options_ui: {
+    page: "src/insights/index.html",
+    open_in_tab: true,
+  },
   background: {
     service_worker: "src/background/index.ts",
     type: "module",
