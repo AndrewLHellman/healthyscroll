@@ -42,7 +42,7 @@ export function PopupMock() {
         </p>
 
         <p className="mt-3 text-[11px] leading-snug text-faint">
-          Video frames aren’t stored. Your watch-time record stays on this phone.
+          Video frames aren’t stored. Only daily totals per topic sync, if you sign in.
         </p>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import type { Category } from "./categories";
+import { medianFromBuckets, WATCH_BUCKETS, type FeedDayEntry } from "./feed";
 import type { WatchRecord } from "./types";
 
 /**
@@ -108,6 +109,75 @@ export function summarize(records: WatchRecord[], opts: { days?: number; now?: n
       savedMs: skipped.length * (medianMs || FALLBACK_DWELL_MS),
       // For skipped videos "ms" is meaningless (we cut them off); rank by count.
       byCategory: totals(skipped, 0).sort((a, b) => b.count - a.count),
+    },
+    days,
+  };
+}
+
+/**
+ * Same Summary as `summarize()`, from per-day, per-category totals (feed.ts)
+ * instead of one record per video. This is what the Reels tally stores, on the
+ * phone and in Supabase. The median watch is estimated from duration buckets.
+ */
+export function summarizeDays(entries: FeedDayEntry[], opts: { days?: number; now?: number } = {}): Summary {
+  const now = opts.now ?? Date.now();
+  const dayCount = opts.days ?? 7;
+
+  const days: DaySummary[] = [];
+  for (let i = dayCount - 1; i >= 0; i--) {
+    days.push({ date: dayKey(now - i * 86_400_000), totalMs: 0, byCategory: {} });
+  }
+  const byDate = new Map(days.map((d) => [d.date, d]));
+
+  const watchedBy = new Map<Category, { ms: number; count: number }>();
+  const skippedBy = new Map<Category, number>();
+  const buckets = WATCH_BUCKETS.map(() => 0);
+
+  for (const { date, category, totals: t } of entries) {
+    const d = byDate.get(date);
+    if (!d) continue;
+    const ms = t.seconds * 1000;
+    const watched = t.seen - t.skipped;
+    if (watched > 0) {
+      d.totalMs += ms;
+      d.byCategory[category] = (d.byCategory[category] ?? 0) + ms;
+      const cur = watchedBy.get(category) ?? { ms: 0, count: 0 };
+      cur.ms += ms;
+      cur.count += watched;
+      watchedBy.set(category, cur);
+    }
+    if (t.skipped > 0) skippedBy.set(category, (skippedBy.get(category) ?? 0) + t.skipped);
+    t.buckets.forEach((n, i) => (buckets[i] += n));
+  }
+
+  const totalMs = sum([...watchedBy.values()].map((v) => v.ms));
+  const watched = sum([...watchedBy.values()].map((v) => v.count));
+  const medianMs = medianFromBuckets(buckets) * 1000;
+  const avgMs = watched ? totalMs / watched : 0;
+
+  const byCategory: CategoryTotal[] = [...watchedBy.entries()]
+    .map(([category, v]) => ({ category, ms: v.ms, count: v.count, share: totalMs ? v.ms / totalMs : 0 }))
+    .sort((a, b) => b.ms - a.ms);
+
+  const holds: Hold[] = byCategory
+    .filter((c) => c.count >= MIN_SAMPLE && avgMs > 0)
+    .map((c) => ({ category: c.category, count: c.count, avgMs: c.ms / c.count, ratio: c.ms / c.count / avgMs }))
+    .sort((a, b) => b.ratio - a.ratio);
+
+  const skippedCount = sum([...skippedBy.values()]);
+
+  return {
+    watched,
+    totalMs,
+    medianMs,
+    byCategory,
+    holds,
+    skipped: {
+      count: skippedCount,
+      savedMs: skippedCount * (medianMs || FALLBACK_DWELL_MS),
+      byCategory: [...skippedBy.entries()]
+        .map(([category, count]) => ({ category, ms: 0, count, share: 0 }))
+        .sort((a, b) => b.count - a.count),
     },
     days,
   };

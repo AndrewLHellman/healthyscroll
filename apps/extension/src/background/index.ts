@@ -8,7 +8,8 @@ import { getPolicy } from "./policyStore";
 import { cancel, onVideoChanged } from "./orchestrator";
 import { forgetTab, onReelActive, onReelsDiscovered } from "./reels";
 import { getAuthState, signIn, signOut } from "./auth";
-import { maybePullPolicy, pullPolicy, startPolicySync } from "./sync";
+import { maybePullPolicy, maybePushFeed, pullPolicy, startPolicySync } from "./sync";
+import { pruneTally, recordViews } from "./tally";
 
 /**
  * Background service worker entry. Routes messages from content scripts into
@@ -85,8 +86,18 @@ chrome.runtime.onMessage.addListener((msg: ContentToBackground | PopupToBackgrou
     case "REEL_ACTIVE":
       void getPolicy().then((policy) => onReelActive(tabId, msg.code, policy));
       break;
+    // Instagram: time on screen for finished Reels -> the "Your week" tally. Nothing while switched off.
+    case "REELS_WATCHED":
+      void getPolicy().then(async (policy) => {
+        if (!policy.enabled) return;
+        await recordViews(msg.views);
+        maybePushFeed(msg.final);
+      });
+      break;
   }
 });
+
+void pruneTally();
 
 chrome.tabs.onRemoved.addListener((tabId) => {
   cancel(tabId);
