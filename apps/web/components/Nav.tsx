@@ -30,7 +30,7 @@ export function Nav() {
             href="#install"
             className="rounded-full bg-ink px-4 py-1.5 text-sm font-medium text-paper transition-colors hover:bg-ink/85"
           >
-            Add to Chrome
+            Get it for iPhone
           </a>
         </div>
       </nav>

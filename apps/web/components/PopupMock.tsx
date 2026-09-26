@@ -42,7 +42,7 @@ export function PopupMock() {
         </p>
 
         <p className="mt-3 text-[11px] leading-snug text-faint">
-          Video frames are analysed on your device. Only text leaves your machine. Your tally stays in this browser.
+          Frames are described and discarded, never stored. Your tally stays on this phone.
         </p>
       </div>
     </div>

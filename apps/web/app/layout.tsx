@@ -21,11 +21,11 @@ const mono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Healthy Scroll: your prompt, your feed",
   description:
-    "A Chrome extension that skips the videos you asked not to see, before they get a chance to hook you. Decisions in about 200 ms. Frames never leave your laptop.",
+    "A Safari extension for iPhone that skips the Instagram Reels you asked not to see, before they get a chance to hook you. Decisions in about 200 ms. Frames are described, then discarded.",
   metadataBase: new URL("https://healthyscroll.net"),
   openGraph: {
     title: "Healthy Scroll",
-    description: "Skip the videos you never wanted to see. Before they hook you.",
+    description: "Skip the Reels you never wanted to see. Before they hook you.",
     type: "website",
   },
 };

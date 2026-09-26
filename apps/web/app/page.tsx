@@ -35,12 +35,13 @@ function Hero() {
           TigerHacks 2026 · Health track
         </p>
         <h1 className="mt-6 font-display text-[2.6rem] font-semibold leading-[1.02] tracking-[-0.03em] sm:text-6xl">
-          Skip the videos you never wanted to see. Before they hook you.
+          Skip the Reels you never wanted to see. Before they hook you.
         </h1>
         <p className="mt-6 max-w-2xl text-lg leading-relaxed text-muted">
-          Healthy Scroll reads each video as it lands in your TikTok feed and skips anything that
-          matches what you asked to avoid, in about 200 milliseconds, without you lifting a finger.
-          You write the rule in plain English. It does the scrolling.
+          Healthy Scroll is a Safari extension for iPhone. It reads each Reel as it lands in your
+          Instagram feed and skips anything that matches what you asked to avoid, in about 200
+          milliseconds, without you lifting a finger. You write the rule in plain English. It does
+          the scrolling.
         </p>
         <div className="mt-8 flex flex-wrap items-center gap-4">
           <a
@@ -48,14 +49,14 @@ function Hero() {
             href="#"
             className="rounded-full bg-accent px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent-ink"
           >
-            Add to Chrome
+            Get it for iPhone
           </a>
           <a href="#how-it-works" className="rounded-md text-sm text-muted transition-colors hover:text-ink">
             See how it works ↓
           </a>
         </div>
         <p className="mt-5 text-xs text-faint">
-          Free. Open source. Video frames never leave your laptop.
+          Free. Open source. Frames are described, then discarded.
         </p>
       </div>
 
@@ -73,7 +74,7 @@ const STAGES = [
     n: "01",
     time: "~200 ms",
     title: "Read the words",
-    body: "The moment a new video lands, its caption, hashtags, sound and visible comments go to Jev, a model that answers one question with a calibrated probability: does this match what you asked to skip? No prose, nothing to parse. Most videos are decided right here, before you’ve registered them.",
+    body: "The moment a new Reel lands, its caption, hashtags, audio and visible comments go to Jev, a model that answers one question with a calibrated probability: does this match what you asked to skip? No prose, nothing to parse. Most videos are decided right here, before you’ve registered them.",
     trace: [
       ["text", "jev", "does this match the policy?"],
       ["", "", "0.96 · skip · 184 ms"],
@@ -81,19 +82,19 @@ const STAGES = [
   },
   {
     n: "02",
-    time: "< 2 s",
+    time: "< 3 s",
     title: "Look closer if it’s unsure",
-    body: "Captions lie. When Jev lands in the middle, Healthy Scroll grabs the current frame and hands it to Moondream, a small vision model running on your own laptop. Moondream describes what it sees; that one sentence goes back to Jev with the rest. The frame itself goes nowhere.",
+    body: "Captions lie. When Jev lands in the middle, Healthy Scroll sends the Reel’s video link to our server, which pulls a single frame and hands it to Moondream, a small vision model. Moondream describes what it sees; that one sentence goes back to Jev with the rest. The frame is discarded the moment it’s described.",
     trace: [
       ["visual", "moondream", "“a crowded bar, people holding drinks”"],
-      ["", "jev", "0.92 · skip · 1.3 s"],
+      ["", "jev", "0.92 · skip · 2.1 s"],
     ],
   },
   {
     n: "03",
-    time: "every 1.5 s",
-    title: "Keep watching while it plays",
-    body: "Videos turn. A cooking clip becomes a drinking clip at second eight. So while anything plays, a fresh frame is checked every 1.5 seconds. If it becomes something you skipped, it’s gone, mid-sentence.",
+    time: "a few s in",
+    title: "Take a second look as it plays",
+    body: "Reels turn. A cooking clip becomes a drinking clip at second eight. So a few seconds into anything still playing, one more frame gets the same treatment. If it’s become something you skipped, it’s gone, mid-sentence.",
     trace: [
       ["monitor", "moondream", "“two people pouring shots at a counter”"],
       ["", "jev", "0.88 · skip · 6.2 s in"],
@@ -107,7 +108,7 @@ function HowItWorks() {
       <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 sm:py-28">
         <SectionHeading
           eyebrow="How it works"
-          title="Three checks. Under two seconds. Nothing leaves your laptop but words."
+          title="Three checks. A few seconds at most. Frames are described, not kept."
           body="Fast and cheap first, careful only when it has to be. Each stage only runs if the one before it couldn’t decide."
         />
 
@@ -138,7 +139,7 @@ function HowItWorks() {
         </ol>
 
         <p className="mt-6 text-sm text-muted">
-          Errors never skip. If a model is unreachable, the video plays like normal.
+          Errors never skip. If a model is unreachable, the Reel plays like normal.
         </p>
       </div>
     </section>
@@ -173,7 +174,7 @@ function Week() {
         <SectionHeading
           eyebrow="Your week"
           title="It also keeps a tally. Of what actually holds you."
-          body="The same Jev call that decides skip-or-keep also says what kind of video it was, for free. Add how long you stayed on each one and you get a week you can read: not a screen-time number, but which videos you can’t put down. The dwell tally stays in your browser."
+          body="The same Jev call that decides skip-or-keep also says what kind of video it was, for free. Add how long you stayed on each one and you get a week you can read: not a screen-time number, but which Reels you can’t put down. The dwell tally stays on your phone."
         />
         <div className="mt-12">
           <WeekMock />
@@ -191,15 +192,15 @@ function Week() {
 const FAQ = [
   {
     q: "Where does it work?",
-    a: "TikTok in Chrome, today. The part that reads the page is a small adapter, so Instagram Reels and YouTube Shorts are next. It’s a browser extension, so it works where you scroll in a browser, not inside the phone apps.",
+    a: "Instagram Reels, in Safari on iPhone. Open instagram.com in Safari, turn the extension on once, and scroll like normal. It’s a browser extension, so Safari is the way in; it can’t reach inside the Instagram app. TikTok in Chrome works too, and YouTube Shorts is next.",
   },
   {
     q: "Do I need anything else?",
-    a: "For the visual check, Moondream Station: a free desktop app that runs the vision model locally. Without it, Healthy Scroll still works from the text alone.",
+    a: "No. Safari, an Instagram account, and the extension. Sign in with Google if you want your prompt to follow you between devices.",
   },
   {
     q: "Does it slow scrolling down?",
-    a: "No. Decisions run alongside the video, not in front of it. The text check returns in about 200 ms; when that says skip, you rarely see the first frame.",
+    a: "No. Decisions run alongside the Reel, not in front of it. The text check returns in about 200 ms; when that says skip, you rarely see the first frame.",
   },
   {
     q: "Will it skip things I wanted?",
@@ -207,15 +208,15 @@ const FAQ = [
   },
   {
     q: "What’s doing the deciding?",
-    a: "Jev, an evaluation model by TypeSafe AI, through Vercel AI Gateway. It returns probabilities instead of prose, which is why it’s fast and nearly free per video. Moondream, a ~2B-parameter vision model, describes frames on your device.",
+    a: "Jev, an evaluation model by TypeSafe AI, through Vercel AI Gateway. It returns probabilities instead of prose, which is why it’s fast and nearly free per video. Moondream, a small vision model, describes a frame in one sentence when the text alone can’t decide.",
   },
   {
     q: "Where does my data go?",
-    a: "Pixels stop at your laptop. Frames go to Moondream on localhost and nowhere else; what reaches our server is text (caption, hashtags, comments and Moondream’s one-sentence description), used for the decision and not kept. If you sign in, we store your prompt and a log of skips (which video, when, which check caught it) so your dashboard can count them. The week’s dwell tally lives in the extension’s local storage. Clear it any time.",
+    a: "Caption, hashtags and comments go to our server as text, for the decision, and aren’t kept. When the text can’t decide, the server fetches one frame of the Reel, has Moondream describe it, and discards it; frames are never stored. If you sign in, we store your prompt and a log of skips (which Reel, when, which check caught it) so your dashboard can count them. The week’s dwell tally lives on your phone. Clear it any time.",
   },
   {
     q: "What does the tally track?",
-    a: "Per video: which of fourteen categories Jev put it in, how long it was on screen, and whether it was skipped. Not the video itself, not who posted it, not what you liked. Categories are broad on purpose: “relationships & drama”, not a profile of you.",
+    a: "Per Reel: which of fourteen categories Jev put it in, how long it was on screen, and whether it was skipped. Not the video itself, not who posted it, not what you liked. Categories are broad on purpose: “relationships & drama”, not a profile of you.",
   },
   {
     q: "What does it cost?",
@@ -267,7 +268,7 @@ function FinalCta() {
             href="#install"
             className="mt-8 inline-block rounded-full bg-accent px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-accent-ink"
           >
-            Add to Chrome
+            Get it for iPhone
           </a>
           <Dashboard />
         </div>

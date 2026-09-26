@@ -32,7 +32,7 @@ export function WeekMock() {
           </span>
         </p>
         <p className="font-mono text-[11px] text-faint">
-          {dayLabel(first)} – {dayLabel(last)} · stays in this browser
+          {dayLabel(first)} – {dayLabel(last)} · stays on this phone
         </p>
       </header>
 

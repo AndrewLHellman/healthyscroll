@@ -1,6 +1,13 @@
 import { Wordmark } from './Wordmark'
 import { PixelHeart } from './Mark'
 
+const TEAM = [
+  { name: 'Andrew Hellman', href: 'https://andrewhellman.com' },
+  { name: 'Spencer Henderson', href: 'https://spencerhenderson.net' },
+  { name: 'Tyler Mitts', href: 'https://tylermitts.com' },
+  { name: 'Zack Murry', href: 'https://zackmurry.com' },
+]
+
 const COLUMNS = [
   {
     title: 'Product',
@@ -15,8 +22,8 @@ const COLUMNS = [
   {
     title: 'Runs on',
     links: [
-      { label: 'TikTok (web)', href: '#faq' },
-      { label: 'Instagram Reels (soon)', href: '#faq' },
+      { label: 'Instagram Reels (Safari)', href: '#faq' },
+      { label: 'TikTok (Chrome)', href: '#faq' },
       { label: 'YouTube Shorts (soon)', href: '#faq' },
     ],
   },
@@ -51,9 +58,21 @@ export function Footer() {
           <Wordmark />
           <p className='max-w-xs text-sm leading-relaxed text-muted'>
             Built with{' '}
-            <PixelHeart size={16} className='inline-block align-[-2px]' /> by
-            Andrew Hellman, Spencer Henderson, Tyler Mitts, and Zack Murry for
-            University of Missouri TigerHacks 2026.
+            <PixelHeart size={16} className='inline-block align-[-2px]' /> by{' '}
+            {TEAM.map((m, i) => (
+              <span key={m.name}>
+                <a
+                  href={m.href}
+                  target='_blank'
+                  rel='noreferrer'
+                  className='rounded-md text-ink underline decoration-line underline-offset-2 transition-colors hover:decoration-ink'
+                >
+                  {m.name}
+                </a>
+                {i < TEAM.length - 2 ? ', ' : i === TEAM.length - 2 ? ', and ' : ''}
+              </span>
+            ))}{' '}
+            for University of Missouri TigerHacks 2026.
           </p>
         </div>
         {COLUMNS.map((col) => (
@@ -82,7 +101,7 @@ export function Footer() {
       <div className='mx-auto flex max-w-6xl flex-col gap-2 border-t border-line px-5 py-6 text-xs text-faint sm:flex-row sm:items-center sm:justify-between sm:px-8'>
         <span>© 2026 Healthy Scroll. Open source.</span>
         <span>
-          Video frames are analysed on your device and never uploaded.
+          Frames are described and discarded, never stored.
         </span>
       </div>
     </footer>

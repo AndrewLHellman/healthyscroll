@@ -111,7 +111,7 @@ function buildFrames(): Frame[] {
     }
 
     if (c.visual) {
-      const mdPending: Line = { stage: "visual", model: "moondream", body: "describing frame on device…", pending: true };
+      const mdPending: Line = { stage: "visual", model: "moondream", body: "describing one frame…", pending: true };
       const mdDone: Line = { stage: "visual", model: "moondream", body: `“${c.visual.caption}”` };
       const jevDone: Line = {
         stage: "visual",
@@ -167,7 +167,7 @@ export function PipelineDemo() {
     <div
       className="rounded-2xl border border-line bg-mist p-3 sm:p-4"
       role="img"
-      aria-label="Animated demo: a TikTok video appears; Healthy Scroll reads its caption, asks Jev for a probability, optionally describes the frame with Moondream on device, and skips the video if it matches the user's policy."
+      aria-label="Animated demo: a Reel appears; Healthy Scroll reads its caption, asks Jev for a probability, optionally has Moondream describe one frame, and skips the Reel if it matches the user's policy."
     >
       <div className="grid gap-3 sm:gap-4 lg:grid-cols-[minmax(0,260px)_1fr]">
         <FeedCard clip={clip} card={frame.card} skipped={frame.skipped || i === null} clipIndex={frame.clip} />
@@ -254,14 +254,14 @@ function Trace({ lines, clip }: { lines: Line[]; clip: Clip }) {
         ))}
         {lines.length === 0 && (
           <li className="text-faint">
-            new video
+            new reel
             <Dots />
           </li>
         )}
       </ol>
 
       <div className="mt-auto flex items-center justify-between gap-3 border-t border-line pt-3 text-[11px] text-faint">
-        <span>frames stay on this laptop</span>
+        <span>frames described, then discarded</span>
         <span className="flex items-center gap-3">
           <Key color="bg-keep" label="keep" />
           <Key color="bg-faint" label="look closer" />
