@@ -42,7 +42,7 @@ export function Thumbnail({
               className={`leading-relaxed ${dark ? "text-paper/60" : "text-muted"}`}
               style={{ fontSize: 22 * t * body, marginTop: 20 * t, maxWidth: 560 * t * body }}
             >
-              Healthy Scroll is a social media filter that makes your Instagram Reels algorithm work for you.
+              Healthy Scroll is a social media filter that makes your Instagram Reels feed align with your mental health goals.
             </p>
           </div>
           {/* Whole units per cell, so the pixels stay crisp. */}
