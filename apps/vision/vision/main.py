@@ -238,7 +238,10 @@ async def describe(req: DescribeRequest, request: Request, authorization: str | 
         caption=media.caption,
         model=settings.captioner,
     )
-    log.info("%s %s cached=%s total=%.0fms", key, media.caption_status, cached, res.totalMs)
+    log.info(
+        "%s %s cached=%s frames=%d (%s, %.0fms) total=%.0fms",
+        key, media.caption_status, cached, len(media.jpegs), media.input_desc, media.frames_ms, res.totalMs,
+    )
     return res
 
 
