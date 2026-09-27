@@ -331,7 +331,10 @@ function Trace({ lines, clip }: { lines: Line[]; clip: Clip }) {
             <span className="pt-px text-[11px] uppercase tracking-wider text-faint">{l.stage}</span>
             <div className="min-w-0">
               <div className="flex flex-wrap items-baseline gap-x-2">
-                <span className={l.model === "jev" ? "text-accent-ink" : "text-muted"}>{l.model}</span>
+                <span className={`inline-flex items-center gap-1 ${l.model === "jev" ? "text-accent-ink" : "text-muted"}`}>
+                  {l.model === "elevenlabs" && <ElevenLabsMark />}
+                  {l.model}
+                </span>
                 <span className={`min-w-0 ${l.pending ? "text-faint" : "text-ink"}`}>
                   {l.body}
                   {l.pending && <Dots />}
@@ -390,6 +393,16 @@ function Meter({ p, verdict, ms }: { p: number; verdict: Verdict; ms?: number })
         </span>
       )}
     </div>
+  );
+}
+
+/** ElevenLabs' mark: two vertical bars, in the current text colour. */
+function ElevenLabsMark({ size = 11 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="currentColor" aria-hidden className="shrink-0">
+      <rect x="3" y="1.5" width="3.6" height="13" rx="0.6" />
+      <rect x="9.4" y="1.5" width="3.6" height="13" rx="0.6" />
+    </svg>
   );
 }
 

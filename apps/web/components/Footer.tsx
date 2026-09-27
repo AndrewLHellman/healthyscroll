@@ -36,6 +36,7 @@ const COLUMNS = [
         href: 'https://typesafe.ai/',
       },
       { label: 'Gemini', href: 'https://deepmind.google/models/gemini/' },
+      { label: 'ElevenLabs Scribe', href: 'https://elevenlabs.io/speech-to-text' },
       { label: 'Vercel AI Gateway', href: 'https://vercel.com/ai-gateway' },
     ],
   },
