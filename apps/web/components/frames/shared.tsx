@@ -66,7 +66,7 @@ export function TraceLine({
   ms,
 }: {
   stage: string;
-  model: "jev" | "moondream";
+  model: "jev" | "gemini" | "moondream";
   body: string;
   p?: number;
   verdict?: Verdict;

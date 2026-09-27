@@ -8,6 +8,7 @@ export function Thumbnail({
   cell = 12,
   type = 1,
   top = 1,
+  body = 1,
 }: {
   dark?: boolean;
   size?: Size;
@@ -17,6 +18,8 @@ export function Thumbnail({
   type?: number;
   /** Further multiplier on the top row (wordmark + url), which otherwise reads small at 3:2. */
   top?: number;
+  /** Multiplier on the subtitle only. */
+  body?: number;
 }) {
   /** Padding scales with the frame width; type scales with that times `type`. */
   const k = size.w / OG.w;
@@ -31,15 +34,15 @@ export function Thumbnail({
         <div className="mt-auto flex items-end justify-between" style={{ gap: 48 * k }}>
           <div>
             <h1 className="font-display font-semibold leading-[0.98] tracking-[-0.035em]" style={{ fontSize: 68 * t }}>
-              You write the rule
+              Take back
               <br />
-              for your feed.
+              your feed.
             </h1>
             <p
               className={`leading-relaxed ${dark ? "text-paper/60" : "text-muted"}`}
-              style={{ fontSize: 22 * t, marginTop: 20 * t, maxWidth: 560 * t }}
+              style={{ fontSize: 22 * t * body, marginTop: 20 * t, maxWidth: 560 * t * body }}
             >
-              Healthy Scroll skips the Reels you never wanted to see. Before they hook you.
+              Healthy Scroll is a social media filter that makes your Instagram Reels algorithm work for you.
             </p>
           </div>
           {/* Whole units per cell, so the pixels stay crisp. */}

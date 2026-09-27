@@ -62,6 +62,7 @@
       caption: o.caption?.text ?? undefined,
       author: o.user?.username ?? o.owner?.username,
       audioTitle: music?.title ?? original?.original_audio_title,
+      audioKind: music ? "music" : original ? "original" : undefined,
     };
   };
 

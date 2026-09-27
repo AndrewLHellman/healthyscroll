@@ -10,9 +10,10 @@ Spike: can the server pull frames from REAL Instagram Reels?
 3. python -m bench.ig_check ["policy text"]
 
 For each captured Reel this tries the DASH manifest and the smallest MP4, and
-prints whether frames came back, how long it took, and the verdict. A 422 with
-"no frames extracted" here means Instagram's CDN refused the server (signed
-URL / IP / session binding) and the extension will have to fetch media itself.
+prints whether frames came back, how long it took, and the verdict. A "failed"
+description (no poster, "no frames extracted" in the server log) here means
+Instagram's CDN refused the server (signed URL / IP / session binding) and the
+extension will have to fetch media itself.
 """
 
 from __future__ import annotations

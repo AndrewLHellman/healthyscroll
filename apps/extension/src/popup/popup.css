@@ -6,7 +6,13 @@
 
 body {
   margin: 0;
+  /* Chrome sizes the popup window to the page, so it needs a width. */
   width: 320px;
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
+}
+
+/* iOS Safari shows the popup as a sheet as wide as the screen: fill it. */
+:root[data-target="safari"] body {
+  width: auto;
 }

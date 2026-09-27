@@ -24,6 +24,12 @@ export interface ReelInfo {
   caption?: string;
   author?: string;
   audioTitle?: string;
+  /**
+   * "music": a licensed track from Instagram's library; "original": the creator's
+   * own sound (voice-over, talking). The audio pass skips "music": its transcript
+   * would mostly be lyrics.
+   */
+  audioKind?: "music" | "original";
 }
 
 /** window.postMessage tag: main-world hook (public/instagram-hook.js) -> content script ({ source, reels: ReelInfo[] }). */
@@ -45,14 +51,23 @@ export type ContentToBackground =
    * Instagram: time on screen for Reels the viewer has moved past, batched.
    * `final` when the page is being hidden: sync now rather than on the throttle.
    */
-  | { type: "REELS_WATCHED"; views: ReelView[]; final?: boolean };
+  | { type: "REELS_WATCHED"; views: ReelView[]; final?: boolean }
+  /** Debug builds only (hs:audio): run the audio pass on this Reel even if Jev wasn't unsure. */
+  | { type: "FORCE_AUDIO"; code: string };
 
 /** background → content */
 export type BackgroundToContent =
   | { type: "SKIP_VIDEO"; videoId: string; decision: Decision }
   | { type: "DECISION"; decision: Decision }
   /** Instagram: move past this Reel (by shortcode), if it's still the one on screen. */
-  | { type: "SKIP_REEL"; code: string; reason: string };
+  | { type: "SKIP_REEL"; code: string; reason: string }
+  /**
+   * Instagram: background has no data for the Reel on screen — send it again.
+   * Happens after the background was unloaded (Chrome kills an idle service
+   * worker after ~30 s; Safari drops the page anytime): everything it had
+   * judged is gone, and the hook only reports each Reel once.
+   */
+  | { type: "REEL_WANTED"; code: string };
 
 /** popup → background. Background replies with AuthResponse. */
 export type PopupToBackground =

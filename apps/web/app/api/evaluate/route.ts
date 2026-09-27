@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import type { EvaluateRequest } from "@healthyscroll/shared";
+import { MAX_TRANSCRIPT_CHARS, type EvaluateRequest } from "@healthyscroll/shared";
 import { decide } from "@/lib/jev";
 import { verifyRequest } from "@/lib/supabase";
 
@@ -36,6 +36,8 @@ const bodySchema = z.object({
     onScreenText: z.array(z.string()).optional(),
   }),
   frames: z.array(frameSchema).optional(),
+  // The Reel's audio transcript, on the last-resort audio pass only.
+  transcript: z.string().max(MAX_TRANSCRIPT_CHARS).optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -51,7 +53,7 @@ export async function POST(req: NextRequest) {
   const body = parsed.data as EvaluateRequest;
 
   // Stage is inferred server-side from what was sent; the client overrides it locally.
-  const stage = body.frames && body.frames.length > 0 ? "visual" : "text";
+  const stage = body.transcript ? "audio" : body.frames && body.frames.length > 0 ? "visual" : "text";
 
   try {
     const decision = await decide(body, stage);

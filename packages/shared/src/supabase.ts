@@ -6,6 +6,15 @@
 export const SUPABASE_URL = "https://ikwvesahfsjpwdnwdfos.supabase.co";
 
 /**
+ * Google OAuth client (type "Web application") the website signs in with
+ * directly (apps/web/lib/googleSignIn.ts), so Google's consent screen names
+ * healthyscroll.net. Must be the client ID configured on Supabase's Google
+ * provider (or in its "Authorized Client IDs"), or signInWithIdToken rejects
+ * the token. Public, like every OAuth client ID.
+ */
+export const GOOGLE_CLIENT_ID = "462886963868-bjabmdbts760sojb5snoc5gadd7l549a.apps.googleusercontent.com";
+
+/**
  * Table rows, mirroring supabase/migrations/*_policies_and_skips.sql.
  * user_id defaults to auth.uid() on insert, so callers can omit it.
  */
@@ -21,7 +30,7 @@ export interface SkipRow {
   user_id: string;
   platform: string;
   video_id: string;
-  stage: "text" | "visual" | "monitor";
+  stage: "text" | "visual" | "monitor" | "audio";
   violates_probability: number | null;
   skipped_at: string;
 }

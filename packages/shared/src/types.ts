@@ -49,6 +49,11 @@ export interface EvaluateRequest {
   context: VideoContext;
   /** Present on the visual pass(es); absent on the fast text-only pass. */
   frames?: FrameDescription[];
+  /**
+   * What's said in the Reel, from its own audio (ElevenLabs, via the vision
+   * service). Only on the last-resort audio pass, when text + frames left Jev unsure.
+   */
+  transcript?: string;
 }
 
 export type Verdict = "skip" | "allow" | "uncertain";
@@ -64,8 +69,8 @@ export interface Decision {
    * Absent only if the model didn't answer the question.
    */
   category?: { label: Category; probability: number };
-  /** Which stage produced this decision. */
-  stage: "text" | "visual" | "monitor";
+  /** Which stage produced this decision. "audio" = text + frames + the Reel's transcript. */
+  stage: "text" | "visual" | "monitor" | "audio";
   /** Wall-clock ms spent inside Jev for observability. */
   latencyMs: number;
 }

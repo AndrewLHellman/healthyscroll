@@ -10,7 +10,7 @@ export function Pipeline() {
           <div>
             <p className="text-[13px] font-medium uppercase tracking-wider text-faint">How it decides</p>
             <h2 className="mt-3 max-w-[820px] font-display text-[44px] font-semibold leading-[1.05] tracking-[-0.03em]">
-              Words first. If they’re not enough, it checks one frame.
+              It checks the words first. At the same time, it describes the Reel’s images.
             </h2>
           </div>
           <BigWordmark height={32} />
@@ -38,12 +38,12 @@ export function Pipeline() {
               <span className="text-faint">@saturday.recap</span>
             </div>
             <ol className="mt-4 flex flex-col gap-4">
-              <TraceLine stage="text" model="jev" body="does this match your rule?" p={0.54} verdict="look" ms={203} />
-              <TraceLine stage="visual" model="moondream" body="“a crowded bar, several people holding drinks and shot glasses”" ms={1310} />
-              <TraceLine stage="visual" model="jev" body="the frame is described. does it match now?" p={0.92} verdict="skip" ms={1310} />
+              <TraceLine stage="text" model="jev" body="does this match your prompt?" p={0.54} verdict="look" />
+              <TraceLine stage="visual" model="gemini" body="“a crowded bar, several people holding drinks and shot glasses”" />
+              <TraceLine stage="visual" model="jev" body="with the video described, does it match?" p={0.92} verdict="skip" />
             </ol>
             <div className="mt-auto flex items-center justify-between border-t border-line pt-3 text-[12px] text-faint">
-              <span>frames are described, then discarded · errors never cause a skip</span>
+              <span>Reel images analyzed on the server · errors never cause a skip</span>
               <span className="flex items-center gap-4">
                 <Key color="bg-keep" label="keep ≤ 0.2" />
                 <Key color="bg-faint" label="look closer" />

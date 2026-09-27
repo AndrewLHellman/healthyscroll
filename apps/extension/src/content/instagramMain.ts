@@ -158,16 +158,37 @@ window.setInterval(checkActive, 250);
 checkActive();
 
 chrome.runtime.onMessage.addListener((msg: BackgroundToContent) => {
+  if (msg.type === "REEL_WANTED") {
+    // Background lost (or never had) this Reel. If the hook has seen it, it
+    // re-sends it -> REELS_DISCOVERED. Unknown codes are already being
+    // requested by checkActive's timer; don't fetch twice.
+    if (known.has(msg.code)) {
+      log("background wants", msg.code);
+      window.postMessage({ source: HELLO_SOURCE, want: msg.code }, window.location.origin);
+    }
+    return;
+  }
   if (msg.type !== "SKIP_REEL") return;
-  // Guard: only skip the Reel that's still on screen.
-  if (msg.code !== getActiveReelCode()) return;
-  log("skipping", msg.code, msg.reason);
-  // Mark it before moving: the move itself ends the view.
-  if (view?.code === msg.code) view.skipped = true;
-  void skipReel(msg.code).then((how) =>
-    log(how ? `skipped ${msg.code} via ${how}` : `skip failed: still on ${msg.code}`),
-  );
+  queueSkip(msg.code, msg.reason);
 });
+
+/**
+ * Skips run one at a time. Several matching Reels in a row means the next
+ * SKIP_REEL arrives while the previous skip is still scrolling; it waits for
+ * that to land, then checks the Reel is (still) the one on screen.
+ */
+let skipQueue: Promise<void> = Promise.resolve();
+function queueSkip(code: string, reason: string): void {
+  skipQueue = skipQueue.then(async () => {
+    // Guard: only skip the Reel that's still on screen.
+    if (code !== getActiveReelCode()) return log("not skipping", code, "(no longer on screen)");
+    log("skipping", code, reason);
+    // Mark it before moving: the move itself ends the view.
+    if (view?.code === code) view.skipped = true;
+    const how = await skipReel(code);
+    log(how ? `skipped ${code} via ${how}` : `skip failed: still on ${code}`);
+  });
+}
 
 if (DEBUG) {
   window.addEventListener("hs:probe", () => console.log("[healthyscroll] probe", probe()));
@@ -177,6 +198,11 @@ if (DEBUG) {
     if (!code) return;
     if (view?.code === code) view.skipped = true;
     void skipReel(code).then((how) => console.log("[healthyscroll] test skip:", how));
+  });
+  // Run the last-resort audio pass (ElevenLabs) on the Reel on screen, even if Jev was sure.
+  window.addEventListener("hs:audio", () => {
+    const code = getActiveReelCode();
+    if (code) send({ type: "FORCE_AUDIO", code });
   });
   // Today's watch totals on this device, plus views not yet sent to background.
   window.addEventListener("hs:tally", () => {

@@ -1,33 +1,65 @@
-# apps/vision — frame analysis service
+# apps/vision — Reel description service
 
 FastAPI service that takes one Instagram Reel (its DASH manifest or a video URL,
-plus the poster) and the user's policy, pulls frames with ffmpeg **without
-downloading the whole video**, and decides whether the Reel shows what the user
-wants to skip.
+plus the poster), pulls frames with ffmpeg **without downloading the whole
+video**, and has a VLM write a short description of what's in them. It makes
+**no decisions** and never sees a user's policy: the extension sends the
+description to Jev (`/api/evaluate`, `frames[].caption`) together with the
+Reel's own text, and Jev decides.
 
 ```
                                           ┌── once per Reel, shared by ALL users (cached) ──┐
-extension ─POST /analyze──▶ vision ──────▶│ ffmpeg: 1 frame / 2 s (max 8) + poster, 448 px  │ ~150-500 ms
- (for upcoming Reels,                     │ SigLIP 2 image embeddings                        │ ~20 ms
-  in parallel with Jev text)              └──────────────────────────────────────────────────┘
-                                   per user: policy concepts · cached embeddings           <1 ms
+extension ─POST /describe─▶ vision ──────▶│ stage "poster": cover image -> VLM description   │ ~0.8 s
+ (for upcoming Reels,                     │ stage "frames": first ~300 KB of the video ->    │ ~1.7 s
+  in parallel with Jev text)              │   3 frames + poster -> VLM description           │ (~4 s laptop GPU)
+                                          │ VLM: <= 60 words — people, activities, objects,  │
+                                          │      setting, quoted on-screen text              │
+                                          └──────────────────────────────────────────────────┘
                                           │
-             skip / allow ◀───────────────┤
-                                          │ uncertain
-                                          ▼
-               caption once per Reel in the background (Qwen3-VL-2B / Gemini)            ~4 s laptop
-               client polls GET /media/instagram/:id → sends caption to Jev (/api/evaluate)
+       first description ◀────────────────┘   captionStatus "pending" = a better one is coming:
+                  │                            poll GET /media/instagram/:id
+                  ▼
+   extension → Jev (/api/evaluate) with text + description → skip, or wait for the next description
 ```
 
 - **Auth:** `Authorization: Bearer <Supabase access token>`, same as `/api/evaluate`.
   **Rate limit:** `VISION_RATE_PER_MIN` per user (prefetch multiplies calls).
-- **Never skip on error:** no frames / bad manifest → `422`; the extension leaves the video alone.
-- **Cache:** frames, embeddings and captions are per Reel and policy-independent, so a popular
-  Reel is fetched and analysed once; each extra user costs a dot product (+ a cheap Jev call).
-  In memory for now (one box).
-- **Scorers** live behind one interface (`vision/scorers`), so switching models is one env var.
-  The benchmark uses the exact same code.
+- **Two stages, each just a description:** Jev is never told which one it is looking at. The
+  extension skips as soon as any description makes Jev say skip and stops polling; otherwise
+  it waits for the frames stage and asks again. Most Reels are settled on the poster.
+- **Never skip on error:** no frames / bad manifest → the frames stage fails; the poster
+  stage still answers if there was a poster, else `captionStatus: "failed"` and the extension
+  lets Jev go on the Reel's text alone.
+- **Cache:** frames and descriptions are per Reel, so a popular Reel is fetched and described
+  once; every extra user costs one Jev call. In memory for now (one box).
+- **Captioner** is `VISION_CAPTIONER`: `qwen3-vl-2b` on a GPU, `gemini-2.5-flash-lite` through the
+  AI Gateway on the deploy server (no GPU there). Models live behind one interface
+  (`vision/scorers`), which `bench/` also uses to compare them as *scorers* — that scoring path
+  is benchmark-only now; the service itself only calls `describe()`.
 - **Contract:** `packages/shared/src/vision.ts` (request/response + the client flow).
+
+## Last resort: `POST /transcribe` (ElevenLabs)
+
+When a Reel's text + description still leave Jev unsure (0.2 < p < 0.8), and
+only once that Reel is on screen, the extension asks for what's *said* in it:
+
+```
+extension ─POST /transcribe─▶ vision: smallest audio track from the DASH manifest,
+                                      first 30 s in one range request (~250 KB)
+                                      → ffmpeg → 16 kHz mono PCM
+                              ─────▶ ElevenLabs Scribe v2 → transcript (cached per Reel)
+extension ─POST /api/evaluate { …, frames: [description], transcript } → Jev decides (final)
+```
+
+- Costs money ($0.22 per hour of audio, ~$0.0018 per 30 s Reel), so it's capped:
+  `TRANSCRIBE_MAX_S` seconds per Reel, `TRANSCRIBE_PER_USER_DAY` and
+  `TRANSCRIBE_DAILY_MAX` new transcriptions per UTC day (cache hits are free;
+  429 past the cap). Set a credit limit on the key in the ElevenLabs dashboard too.
+- Reels using a licensed song are skipped by the extension (the transcript would be lyrics).
+- No `ELEVENLABS_API_KEY` → 503, and the extension keeps its earlier answer.
+- `GET /health` shows today's count, audio seconds and estimated cost.
+- Privacy: only the Reel's public audio is sent; nothing about the user. ElevenLabs'
+  zero-retention mode is Enterprise-only, so they may log it.
 
 ## Setup (Windows, from `apps/vision`)
 

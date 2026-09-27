@@ -32,7 +32,7 @@ function Hero() {
       <div className="max-w-3xl">
         <p className="inline-flex items-center gap-2 rounded-full border border-line px-3 py-1 text-xs text-muted">
           <PixelHeart size={9} />
-          TigerHacks 2026 · Health track
+          Built at TigerHacks 2026
         </p>
         <h1 className="mt-6 font-display text-[2.6rem] font-semibold leading-[1.02] tracking-[-0.03em] sm:text-6xl">
           Take back your feed.
@@ -55,7 +55,7 @@ function Hero() {
           </a>
         </div>
         <p className="mt-5 text-xs text-faint">
-          Free and open source. No account required.
+          Free and open source. Sign in with Google to get started.
         </p>
       </div>
 
@@ -116,11 +116,11 @@ const FAQ = [
   },
   {
     q: "Do I need an account?",
-    a: "No. You can save your prompt on your device without signing in. Sign in with Google to sync it between devices.",
+    a: "Yes. Sign in with Google in the extension to turn on filtering and sync your prompt and daily summaries with your dashboard.",
   },
   {
     q: "Does it slow scrolling down?",
-    a: "Reels keep playing while they’re checked. You may see part of a Reel before it gets skipped. If a check fails, the Reel keeps playing.",
+    a: "Healthy Scroll checks upcoming Reels as Instagram loads them. Reels keep playing during checks, so you may see part of one before it gets skipped. A failed check won’t trigger a skip.",
   },
   {
     q: "Will it skip things I wanted?",
@@ -128,11 +128,11 @@ const FAQ = [
   },
   {
     q: "What’s doing the deciding?",
-    a: "Two checks run side by side. An AI model called Jev reads the caption, hashtags, and sound against your prompt, while a vision model (SigLIP 2) checks a few frames of the video. If the frames are inconclusive, a second vision model (Qwen3-VL) takes a closer look. Whichever is confident first decides.",
+    a: "Jev checks each Reel’s text against your prompt. At the same time, our server uses Gemini to describe its cover image and video frames. Jev uses those descriptions to refine its decision.",
   },
   {
     q: "Where does my data go?",
-    a: "Your prompt, captions, and comments are sent to our server for evaluation. Captions and comments aren’t stored. To check the video, our server fetches a few frames of the Reel itself; they’re held in memory briefly and never saved. Signing in saves your prompt, a skip log, and daily totals per topic (how many Reels, how long) for your dashboard. Which Reels you watched never leaves your phone.",
+    a: "Your prompt and Reel text go to our server for evaluation. Visual checks use the Reel’s own images and video, without uploading your screen. For the occasional Reel that’s still unclear, ElevenLabs transcribes that Reel’s own audio. Daily totals by topic sync to your dashboard.",
   },
   {
     q: "What does the weekly summary track?",

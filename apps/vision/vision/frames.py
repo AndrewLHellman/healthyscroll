@@ -7,11 +7,18 @@ representation and hand its URL to ffmpeg with `-ss` *before* `-i`, so ffmpeg
 reads the index and fetches only the bytes around each timestamp (HTTP range
 requests). The same path works for a plain progressive MP4 URL or a local file.
 
-Frames: one every VISION_FRAME_EVERY_S (default 2 s), at most VISION_MAX_FRAMES (8),
-plus the poster image as frame 0 when given. ffmpeg runs once per timestamp, in
-parallel threads. (Threads rather than
-asyncio subprocesses: the latter needs the Proactor loop on Windows, which
-uvicorn doesn't always use.)
+Frames: one every VISION_FRAME_EVERY_S (default 3 s), at most VISION_MAX_FRAMES (3),
+plus the poster image as frame 0 when given. Greedy by design: one range request
+for the first few hundred KB of the smallest representation (prefix_budget),
+decoded from memory by one ffmpeg process; whatever frames fall inside that
+prefix are the frames. Fixed cost per Reel, however long it is. If the file's
+index isn't at the front (a non-faststart MP4) ffmpeg seeks over HTTP instead.
+(History, 2026-09-27: one ffmpeg per timestamp, each with its own TLS handshake
++ index fetch + seek to a CDN 155 ms away, took 5-7 s per Reel; one ffmpeg
+streaming 10 s of video took ~3.4 s; the VLM itself takes < 1 s.)
+Explicit timestamps (benchmarks) still use one seek per timestamp.
+ffmpeg runs in threads rather than asyncio subprocesses: the latter needs the
+Proactor loop on Windows, which uvicorn doesn't always use.
 """
 
 from __future__ import annotations
@@ -67,8 +74,8 @@ class Frames:
 def sample_timestamps(duration: float | None) -> list[float]:
     """0.5 s, then every VISION_FRAME_EVERY_S, capped at VISION_MAX_FRAMES and the video's length.
 
-    With no known duration we ask for the full set; ffmpeg returns nothing past
-    the end and those frames are dropped (requests run in parallel, so it's free).
+    With no known duration we ask for the full set; ffmpeg stops at the end of a
+    shorter video and we keep the frames it did produce.
     """
     step, cap = settings.frame_every_s, settings.max_frames
     ts = [0.5 + i * step for i in range(cap)]
@@ -77,8 +84,8 @@ def sample_timestamps(duration: float | None) -> list[float]:
     return ts
 
 
-def pick_dash_video_url(manifest: str) -> tuple[str | None, float | None]:
-    """Smallest video representation's BaseURL (>= 360p when available) and the duration in seconds."""
+def pick_dash_video_url(manifest: str) -> tuple[str | None, float | None, int | None]:
+    """Smallest video representation's BaseURL (>= 360p when available), the duration in seconds, its bandwidth (bit/s)."""
     try:
         root = ET.fromstring(manifest)
     except ET.ParseError as err:
@@ -100,10 +107,10 @@ def pick_dash_video_url(manifest: str) -> tuple[str | None, float | None]:
             candidates.append((height, bandwidth, base.text.strip()))
 
     if not candidates:
-        return None, duration
+        return None, duration, None
     good = [c for c in candidates if c[0] >= 360] or candidates
     good.sort(key=lambda c: (c[1], c[0]))
-    return good[0][2], duration
+    return good[0][2], duration, good[0][1] or None
 
 
 def _parse_iso_duration(value: str | None) -> float | None:
@@ -122,30 +129,130 @@ def _parse_iso_duration(value: str | None) -> float | None:
     return seconds
 
 
-def _grab_one(input_: str, t: float, long_side: int, is_remote: bool) -> Image.Image | None:
-    # Scale so the longer side is `long_side` (Reels are portrait; this keeps landscape sane too).
-    scale = f"scale='if(gt(iw,ih),{long_side},-2)':'if(gt(iw,ih),-2,{long_side})'"
+def _ffmpeg_cmd(input_: str, start: float, is_remote: bool) -> list[str]:
     cmd = [settings.ffmpeg, "-hide_banner", "-loglevel", "error", "-nostdin"]
     if is_remote:
         cmd += ["-user_agent", USER_AGENT, "-rw_timeout", "8000000"]
         cmd += ["-protocol_whitelist", "file,http,https,tcp,tls,crypto"]
-    cmd += ["-ss", f"{t:.3f}", "-i", input_, "-frames:v", "1", "-vf", scale]
-    cmd += ["-f", "image2pipe", "-vcodec", "mjpeg", "-q:v", "3", "pipe:1"]
+    # -ss before -i: seek in the container index, don't decode from 0.
+    return cmd + ["-ss", f"{start:.3f}", "-i", input_]
+
+
+def _scale_filter(long_side: int) -> str:
+    # Scale so the longer side is `long_side` (Reels are portrait; this keeps landscape sane too).
+    return f"scale='if(gt(iw,ih),{long_side},-2)':'if(gt(iw,ih),-2,{long_side})'"
+
+
+_MJPEG_OUT = ["-f", "image2pipe", "-vcodec", "mjpeg", "-q:v", "3", "pipe:1"]
+_JPEG_SOI = b"\xff\xd8\xff"
+
+
+def _grab_one(input_: str, t: float, long_side: int, is_remote: bool) -> Image.Image | None:
+    cmd = _ffmpeg_cmd(input_, t, is_remote) + ["-frames:v", "1", "-vf", _scale_filter(long_side)] + _MJPEG_OUT
     proc = subprocess.run(cmd, capture_output=True, timeout=FFMPEG_TIMEOUT_S)
     if proc.returncode != 0 or not proc.stdout:
         return None
     return Image.open(BytesIO(proc.stdout)).convert("RGB")
 
 
+def _grab_every(
+    input_: str, start: float, step: float, count: int, long_side: int, is_remote: bool
+) -> list[Image.Image]:
+    """`count` frames at start, start+step, ... from one ffmpeg run (one connection, one decode)."""
+    # select: the first frame, then the first frame at least `step` after the last
+    # selected one. (Not the fps filter: it waits for the frame *after* each slot,
+    # so the last one never arrives within -t.)
+    select = f"select='isnan(prev_selected_t)+gte(t-prev_selected_t\\,{step:g})'"
+    cmd = _ffmpeg_cmd(input_, start, is_remote)
+    cmd += ["-t", f"{step * (count - 1) + 0.6:.3f}", "-frames:v", str(count)]
+    cmd += ["-vf", f"{select},{_scale_filter(long_side)}", "-fps_mode", "passthrough"] + _MJPEG_OUT
+    proc = subprocess.run(cmd, capture_output=True, timeout=FFMPEG_TIMEOUT_S)
+    # A non-zero exit with some frames out (e.g. short video) is still useful.
+    return _split_mjpeg(proc.stdout, count)
+
+
+# One client for every CDN fetch: keep-alive skips the TLS handshake (~0.3 s at
+# the CDN's distance) for the next Reel on the same host.
+_http = httpx.Client(headers={"User-Agent": USER_AGENT}, timeout=6, follow_redirects=True)
+
+# How much of the video to pull: enough for PREFIX_S seconds at the
+# representation's bitrate (plus the index at the front), within bounds.
+PREFIX_S = 6.0
+PREFIX_MIN = 200_000
+PREFIX_MAX = 600_000
+PREFIX_UNKNOWN = 450_000  # a progressive MP4 URL: bitrate unknown, usually 720p
+
+
+def prefix_budget(bandwidth: int | None) -> int:
+    if not bandwidth:
+        return PREFIX_UNKNOWN
+    return int(min(PREFIX_MAX, max(PREFIX_MIN, bandwidth / 8 * PREFIX_S * 1.15 + 64_000)))
+
+
+def _fetch_prefix(url: str, budget: int) -> bytes:
+    """The first `budget` bytes of the file: one range request, no more."""
+    buf = bytearray()
+    try:
+        with _http.stream("GET", url, headers={"Range": f"bytes=0-{budget - 1}"}) as res:
+            if res.status_code not in (200, 206):
+                return b""
+            for chunk in res.iter_bytes():
+                buf += chunk
+                if len(buf) >= budget:
+                    break  # the server ignored Range (200): stop reading anyway
+    except httpx.HTTPError:
+        return b""
+    return bytes(buf[:budget])
+
+
+def _grab_from_bytes(data: bytes, step: float, count: int, long_side: int) -> list[Image.Image]:
+    """Up to `count` frames, `step` seconds apart, from a truncated MP4/fMP4 in memory.
+
+    ffmpeg decodes what's there and errors at the cut; the frames it emitted
+    first are still on stdout. Needs the index (moov / sidx) at the front, which
+    DASH representations and faststart MP4s have. Returns [] otherwise.
+    """
+    # First frame after the fade-in, then one every `step`.
+    select = f"select='gte(t\\,0.4)*isnan(prev_selected_t)+gte(t-prev_selected_t\\,{step:g})'"
+    cmd = [settings.ffmpeg, "-hide_banner", "-loglevel", "error", "-nostdin", "-i", "pipe:0"]
+    cmd += ["-frames:v", str(count), "-vf", f"{select},{_scale_filter(long_side)}", "-fps_mode", "passthrough"]
+    cmd += _MJPEG_OUT
+    try:
+        proc = subprocess.run(cmd, input=data, capture_output=True, timeout=FFMPEG_TIMEOUT_S)
+    except subprocess.TimeoutExpired:
+        return []
+    return _split_mjpeg(proc.stdout, count)
+
+
+def _split_mjpeg(data: bytes, count: int) -> list[Image.Image]:
+    images: list[Image.Image] = []
+    # An MJPEG stream is just JPEGs back to back; SOI can't occur inside a JPEG.
+    for chunk in data.split(_JPEG_SOI)[1:]:
+        try:
+            images.append(Image.open(BytesIO(_JPEG_SOI + chunk)).convert("RGB"))
+        except OSError:
+            break  # truncated last frame
+    return images[:count]
+
+
 def _fetch_poster(url: str, long_side: int) -> Image.Image | None:
     try:
-        res = httpx.get(url, headers={"User-Agent": USER_AGENT}, timeout=5, follow_redirects=True)
+        res = _http.get(url)
         res.raise_for_status()
         img = Image.open(BytesIO(res.content)).convert("RGB")
     except (httpx.HTTPError, OSError):
         return None  # the video frames are enough on their own
     img.thumbnail((long_side, long_side))
     return img
+
+
+async def fetch_poster(url: str, long_side: int | None = None) -> Image.Image | None:
+    """The Reel's cover image, resized like a frame. None if it can't be fetched.
+
+    main.py fetches this on its own, ahead of the video: one small JPEG is enough
+    for a first description while ffmpeg is still working on the frames.
+    """
+    return await asyncio.to_thread(_fetch_poster, url, long_side or settings.frame_long_side)
 
 
 async def extract_frames(
@@ -158,9 +265,10 @@ async def extract_frames(
 
     tmp_manifest: Path | None = None
     duration: float | None = None
+    bandwidth: int | None = None
     try:
         if source.manifest:
-            url, duration = pick_dash_video_url(source.manifest)
+            url, duration, bandwidth = pick_dash_video_url(source.manifest)
             if url:
                 input_, remote, desc = url, True, "dash-representation"
             else:
@@ -176,18 +284,39 @@ async def extract_frames(
         else:
             raise ValueError("VideoSource needs manifest, url or path")
 
-        if timestamps:
-            # Explicit timestamps: still don't ask for frames past the end.
-            timestamps = [t for t in timestamps if not duration or t < duration - 0.1] or [0.5]
-        else:
-            timestamps = sample_timestamps(duration)
-
         poster_task = (
             asyncio.to_thread(_fetch_poster, source.poster_url, long_side) if source.poster_url else None
         )
-        results = await asyncio.gather(
-            *(asyncio.to_thread(_grab_one, input_, t, long_side, remote) for t in timestamps)
-        )
+        if timestamps:
+            # Explicit timestamps: still don't ask for frames past the end.
+            timestamps = [t for t in timestamps if not duration or t < duration - 0.1] or [0.5]
+            results = await asyncio.gather(
+                *(asyncio.to_thread(_grab_one, input_, t, long_side, remote) for t in timestamps)
+            )
+        else:
+            timestamps = sample_timestamps(duration)
+            step = settings.frame_every_s
+            images: list[Image.Image] = []
+            if remote and desc != "dash-manifest":
+                # Greedy path: the first few hundred KB in one range request,
+                # decoded from memory. Cost is fixed no matter how long the Reel is.
+                data = await asyncio.to_thread(_fetch_prefix, input_, prefix_budget(bandwidth))
+                if data:
+                    images = await asyncio.to_thread(_grab_from_bytes, data, step, len(timestamps), long_side)
+                    if images:
+                        desc += "+prefix"
+            if not images:
+                # Index not at the front, or the fetch failed: let ffmpeg seek over HTTP.
+                if len(timestamps) == 1:
+                    one = await asyncio.to_thread(_grab_one, input_, timestamps[0], long_side, remote)
+                    images = [one] if one else []
+                else:
+                    images = await asyncio.to_thread(
+                        _grab_every, input_, timestamps[0], step, len(timestamps), long_side, remote
+                    )
+            # A short video (or a small prefix) yields fewer frames; they're the leading ones.
+            timestamps = timestamps[: len(images)]
+            results = list(images)
         poster = await poster_task if poster_task else None
     finally:
         if tmp_manifest:
@@ -202,3 +331,108 @@ async def extract_frames(
         elapsed_ms=(time.perf_counter() - started) * 1000,
         input_desc=desc,
     )
+
+
+# --- audio (POST /transcribe) -------------------------------------------------
+#
+# The last-resort pass: when a Reel's text + description leave Jev unsure, the
+# Reel's own audio is transcribed (ElevenLabs, see transcribe.py). Same idea as
+# the frames: Instagram's DASH manifest lists a separate audio track (AAC,
+# ~64-128 kbit/s), so one range request for its first ~30 s is a few hundred KB.
+# ffmpeg turns that into 16 kHz mono PCM, the format ElevenLabs takes fastest.
+
+PCM_BYTES_PER_S = 16_000 * 2  # 16 kHz, 16-bit, mono
+AUDIO_PREFIX_MIN = 120_000
+AUDIO_PREFIX_MAX = 1_500_000
+AUDIO_PREFIX_UNKNOWN = 700_000
+
+
+@dataclass
+class AudioClip:
+    pcm: bytes  # s16le, 16 kHz, mono
+    seconds: float
+    input_desc: str
+
+
+def pick_dash_audio_url(manifest: str) -> tuple[str | None, int | None]:
+    """Smallest audio representation's BaseURL and its bandwidth (bit/s), or (None, None) if there's no audio track."""
+    try:
+        root = ET.fromstring(manifest)
+    except ET.ParseError as err:
+        raise ValueError(f"manifest is not valid XML: {err}") from err
+    candidates: list[tuple[int, str]] = []  # (bandwidth, url)
+    for aset in root.iterfind(".//mpd:AdaptationSet", _DASH_NS):
+        for rep in aset.iterfind("mpd:Representation", _DASH_NS):
+            mime = rep.get("mimeType") or aset.get("mimeType") or ""
+            ctype = aset.get("contentType") or ""
+            if "audio" not in mime and ctype != "audio":
+                continue
+            base = rep.find("mpd:BaseURL", _DASH_NS)
+            if base is None or not (base.text or "").strip():
+                continue
+            candidates.append((int(rep.get("bandwidth") or 0), base.text.strip()))
+    if not candidates:
+        return None, None
+    candidates.sort()
+    return candidates[0][1], candidates[0][0] or None
+
+
+def audio_prefix_budget(bandwidth: int | None, max_s: float) -> int:
+    if not bandwidth:
+        return AUDIO_PREFIX_UNKNOWN
+    return int(min(AUDIO_PREFIX_MAX, max(AUDIO_PREFIX_MIN, bandwidth / 8 * max_s * 1.1 + 64_000)))
+
+
+_PCM_OUT = ["-vn", "-ac", "1", "-ar", "16000", "-acodec", "pcm_s16le", "-f", "s16le", "pipe:1"]
+
+
+def _pcm_from_bytes(data: bytes, max_s: float) -> bytes:
+    """Decode up to max_s of audio from a (possibly truncated) MP4/fMP4 in memory."""
+    cmd = [settings.ffmpeg, "-hide_banner", "-loglevel", "error", "-nostdin", "-i", "pipe:0", "-t", f"{max_s:.1f}"]
+    try:
+        proc = subprocess.run(cmd + _PCM_OUT, input=data, capture_output=True, timeout=FFMPEG_TIMEOUT_S)
+    except subprocess.TimeoutExpired:
+        return b""
+    # A truncated file errors at the cut; what was decoded before it is still on stdout.
+    return proc.stdout
+
+
+def _pcm_from_url(url: str, max_s: float) -> bytes:
+    """ffmpeg reads the URL itself (range requests); used when the prefix didn't decode."""
+    cmd = _ffmpeg_cmd(url, 0.0, is_remote=True) + ["-t", f"{max_s:.1f}"]
+    try:
+        proc = subprocess.run(cmd + _PCM_OUT, capture_output=True, timeout=FFMPEG_TIMEOUT_S)
+    except subprocess.TimeoutExpired:
+        return b""
+    return proc.stdout
+
+
+async def extract_audio(source: VideoSource, max_s: float) -> AudioClip | None:
+    """The first max_s seconds of the Reel's audio as PCM, or None if it has none we can read."""
+    if source.manifest:
+        url, bandwidth = pick_dash_audio_url(source.manifest)
+        if not url:
+            return None  # a silent Reel, or audio muxed into the video track (not seen on Instagram)
+        desc = "dash-audio"
+        data = await asyncio.to_thread(_fetch_prefix, url, audio_prefix_budget(bandwidth, max_s))
+        pcm = await asyncio.to_thread(_pcm_from_bytes, data, max_s) if data else b""
+        if pcm:
+            desc += "+prefix"
+        else:
+            pcm = await asyncio.to_thread(_pcm_from_url, url, max_s)
+    elif source.url:
+        # A progressive MP4 interleaves video and audio, so this reads the video
+        # bytes too; ffmpeg over HTTP stops after max_s.
+        desc = "url"
+        pcm = await asyncio.to_thread(_pcm_from_url, source.url, max_s)
+    elif source.path:
+        desc = "file"
+        pcm = await asyncio.to_thread(_pcm_from_bytes, Path(source.path).read_bytes(), max_s)
+    else:
+        raise ValueError("VideoSource needs manifest, url or path")
+
+    pcm = pcm[: len(pcm) - len(pcm) % 2]  # whole samples only
+    seconds = len(pcm) / PCM_BYTES_PER_S
+    if seconds < 0.5:
+        return None
+    return AudioClip(pcm=pcm, seconds=seconds, input_desc=desc)

@@ -15,11 +15,24 @@ def yes_no_prompt(policy: str, n_frames: int) -> str:
 
 
 def describe_prompt(n_frames: int) -> str:
-    """Policy-independent description, cached per Reel and handed to Jev as a frame caption."""
+    """
+    Policy-independent description, cached per Reel and handed to Jev as a frame caption.
+
+    Jev decides against policies we can't see ("women", "Minecraft", "gambling",
+    "politics"...), and it only knows what this text says. So the description has
+    to be concrete: Gemini writes "a person" and "a video game" unless told to
+    commit (2026-09-27: a Reel of a woman talking to camera came back as "a
+    person ... speaking", and a Minecraft Reel as "a video game").
+    """
     return (
-        f"These are {n_frames} frames from one short video, in order. In under 40 words, say what "
-        "the video is about: people, activities, objects, setting, and any on-screen text (quote it). "
-        "No filler about colours, layout or mood."
+        f"These are {n_frames} frames from one short video, in order. In under 60 words, describe "
+        "what the video shows, as concretely as possible:\n"
+        "- people: how many, apparent gender and age group (e.g. \"a young woman\", \"two teenage boys\", "
+        "\"an older man\"), what they wear and do;\n"
+        "- the topic or genre (comedy skit, dance, cooking, sport, gaming, news, advert, ...);\n"
+        "- name what you recognise: the game, show, sport, team, brand, product, celebrity, place;\n"
+        "- activities, objects, setting, and on-screen text (quote it).\n"
+        "Be direct, never hedge or say 'a person' when you can tell more. No filler about colours, layout or mood."
     )
 
 

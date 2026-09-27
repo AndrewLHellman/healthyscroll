@@ -6,17 +6,10 @@ import { PixelHeart } from "./Mark";
 
 /**
  * Looping, scripted trace of the real pipeline: a Reels-style feed on the left
- * that actually swipes, the decision log on the right. Mirrors
- * apps/extension/src/background/reels.ts:
- *
- *   text    Jev reads caption, tags, sound                       (~200 ms)
- *   frames  vision service checks a few frames vs. the prompt    (SigLIP 2, ~1 s)
- *   closer  only if frames are unsure: a VLM looks again         (Qwen3-VL, ~0.5 s)
- *
- * First "skip" wins and the feed swipes itself; otherwise the viewer watches and
- * swipes on. Probabilities sit on a meter with the two thresholds (0.2 / 0.8).
- * Covers are the real Reels in public/playground/ (same as the playground);
- * handles and captions are illustrative, written to match each cover.
+ * that actually swipes, the decision log on the right. Probabilities are shown
+ * on a meter with the two thresholds (0.2 / 0.8) so the mechanism is visible
+ * without explanation. Covers are real Reels from public/playground/ (same as
+ * the prompt playground); handles and captions are illustrative.
  *
  * Under prefers-reduced-motion it renders one fully-resolved frame, static.
  */
@@ -24,76 +17,60 @@ import { PixelHeart } from "./Mark";
 const POLICY = "gambling, drinking, thirst-trap content";
 
 type Verdict = "skip" | "keep" | "look";
-type Stage = "text" | "frames" | "closer";
 
 interface Clip {
   author: string;
   desc: string;
   sound: string;
+  /** Real Reel cover (public/playground/). */
   image: string;
   /** Fallback under the image while it loads. */
   tone: [string, string];
   text: { p: number; ms: number };
-  frames?: { body: string; p: number; ms: number };
-  closer?: { body: string; p: number; ms: number };
+  visual?: { caption: string; p: number; ms: number };
 }
 
 const CLIPS: Clip[] = [
   {
-    // Caption says it all: text alone skips it before the frames finish.
-    author: "casino.nights",
-    desc: "slot wins all night 🎰 #slots #casino",
-    sound: "original audio",
+    author: "spinsdaily",
+    desc: "late night spins hit different 🎰 #slots #bigwin",
+    sound: "original sound",
     image: "/playground/gambling.jpg",
     tone: ["#3b1d5a", "#0f0c1a"],
     text: { p: 0.96, ms: 184 },
   },
   {
-    // Nothing to catch: the viewer watches, then swipes on.
-    author: "boardwalk.miles",
-    desc: "what people see vs. what it feels like 😅 #running",
-    sound: "original audio",
+    author: "trail.mornings",
+    desc: "6am run before work. always worth it",
+    sound: "Avril 14th · Aphex Twin",
     image: "/playground/run.jpg",
     tone: ["#d9c7a3", "#5e6a4e"],
     text: { p: 0.03, ms: 171 },
-    frames: { body: "runners on a seaside path · no match", p: 0.02, ms: 940 },
+    visual: { caption: "two people running along a seaside path under a cloudy sky", p: 0.02, ms: 1240 },
   },
   {
-    // Vague caption, unsure frames: the VLM reads the on-screen text and settles it.
-    author: "friday.moods",
-    desc: "me every friday 😂",
+    author: "saturday.recap",
+    desc: "and that was the night 🍾",
     sound: "trending audio",
     image: "/playground/drinking.jpg",
     tone: ["#1b2a44", "#0a0e17"],
-    text: { p: 0.44, ms: 203 },
-    frames: { body: "a man in a bar · unsure", p: 0.46, ms: 1010 },
-    closer: { body: "on-screen text: “me after 3 margaritas” → drinking", p: 0.91, ms: 520 },
+    text: { p: 0.54, ms: 203 },
+    visual: { caption: "a man in a busy bar; on-screen text: ‘Also me after 3 margaritas’", p: 0.92, ms: 1310 },
   },
   {
-    // Caption is harmless; the frames give it away.
-    author: "lift.with.jay",
-    desc: "pump was unreal today 💪",
-    sound: "phonk mix",
-    image: "/playground/thirst-trap.jpg",
-    tone: ["#2b2b2b", "#0d0d0d"],
-    text: { p: 0.58, ms: 190 },
-    frames: { body: "shirtless posing, frame 2 · matches thirst-trap", p: 0.9, ms: 980 },
-  },
-  {
-    author: "weeknight.eats",
-    desc: "flatbread + butter chicken in 30 min 🔥",
+    author: "ana.bakes",
+    desc: "flatbread + butter chicken, weeknight edition",
     sound: "Kitchen sounds",
     image: "/playground/food.jpg",
     tone: ["#e8b27a", "#7a4a22"],
     text: { p: 0.02, ms: 158 },
-    frames: { body: "flatbread on a tray · no match", p: 0.01, ms: 900 },
+    visual: { caption: "a tray of stuffed flatbreads topped with herbs", p: 0.01, ms: 1190 },
   },
 ];
 
-const MODEL: Record<Stage, string> = { text: "jev", frames: "siglip", closer: "qwen-vl" };
-
 interface Line {
-  stage: Stage;
+  stage: "text" | "visual";
+  model: "jev" | "gemini";
   body: string;
   p?: number;
   ms?: number;
@@ -104,7 +81,6 @@ interface Line {
 interface Frame {
   clip: number;
   lines: Line[];
-  /** "out": the current Reel is swiping up and the next one is coming in. */
   card: "in" | "out";
   skipped: boolean;
   hold: number;
@@ -123,57 +99,56 @@ function buildFrames(): Frame[] {
     const push = (lines: Line[], hold: number, card: Frame["card"] = "in", skipped = false) =>
       frames.push({ clip: i, lines, card, skipped, hold });
 
-    const done = (stage: Stage, body: string, r: { p: number; ms: number }): Line => ({
-      stage,
-      body,
-      p: r.p,
-      ms: r.ms,
-      verdict: verdictOf(r.p),
-    });
-
-    const textPending: Line = { stage: "text", body: "reading caption, tags, sound…", pending: true };
-    const textDone = done("text", "does this match the prompt?", c.text);
-    const framesPending: Line = { stage: "frames", body: "checking frames…", pending: true };
+    const textPending: Line = { stage: "text", model: "jev", body: "reading caption, tags, sound…", pending: true };
+    const textDone: Line = {
+      stage: "text",
+      model: "jev",
+      body: "does this match the policy?",
+      p: c.text.p,
+      ms: c.text.ms,
+      verdict: verdictOf(c.text.p),
+    };
 
     push([], 520);
-    // Both start at once; text usually answers first.
-    push(c.frames ? [textPending, framesPending] : [textPending], 280);
+    push([textPending], 260);
+    push([textDone], textDone.verdict === "skip" ? 900 : 700);
+
     if (textDone.verdict === "skip") {
-      push([textDone], 900);
       push([textDone], 560, "out", true);
       return;
     }
-    if (!c.frames) {
-      push([textDone], 1300);
-      push([textDone], 700, "out");
+
+    if (c.visual) {
+      const mdPending: Line = { stage: "visual", model: "gemini", body: "describing the Reel’s images…", pending: true };
+      const mdDone: Line = { stage: "visual", model: "gemini", body: `“${c.visual.caption}”` };
+      const jevDone: Line = {
+        stage: "visual",
+        model: "jev",
+        body: "with the video described, does it match?",
+        p: c.visual.p,
+        ms: c.visual.ms,
+        verdict: verdictOf(c.visual.p),
+      };
+      push([textDone, mdPending], 900);
+      push([textDone, mdDone], 600);
+      push([textDone, mdDone, jevDone], jevDone.verdict === "skip" ? 900 : 1500);
+      if (jevDone.verdict === "skip") {
+        push([textDone, mdDone, jevDone], 560, "out", true);
+        return;
+      }
+      // Kept: the user watches, then scrolls on themselves.
+      push([textDone, mdDone, jevDone], 700, "out", false);
       return;
     }
 
-    const framesDone = done("frames", c.frames.body, c.frames);
-    push([textDone, framesPending], 700);
-    push([textDone, framesDone], framesDone.verdict === "look" ? 700 : framesDone.verdict === "skip" ? 900 : 1300);
-
-    let lines = [textDone, framesDone];
-    let verdict = framesDone.verdict;
-    if (verdict === "look" && c.closer) {
-      const closerPending: Line = { stage: "closer", body: "frames unsure · taking a closer look…", pending: true };
-      const closerDone = done("closer", c.closer.body, c.closer);
-      push([...lines, closerPending], 800);
-      lines = [...lines, closerDone];
-      verdict = closerDone.verdict;
-      push(lines, verdict === "skip" ? 1000 : 1300);
-    }
-
-    if (verdict === "skip") push(lines, 560, "out", true);
-    // Kept: the viewer watches a bit longer, then swipes on themselves.
-    else push(lines, 700, "out", false);
+    push([textDone], 700, "out", false);
   });
   return frames;
 }
 
 const FRAMES = buildFrames();
-/** The most legible single frame for the static (reduced-motion / SSR-first) render: the three-stage one. */
-const STATIC_FRAME = FRAMES.findLast((f) => f.clip === 2 && f.lines.length === 3 && !f.lines[2].pending)!;
+/** The most legible single frame for the static (reduced-motion / SSR-first) render. */
+const STATIC_FRAME = FRAMES.findLast((f) => f.clip === 2 && f.lines.length === 3 && f.card === "in")!;
 
 export function PipelineDemo() {
   const [i, setI] = useState<number | null>(null);
@@ -200,7 +175,7 @@ export function PipelineDemo() {
     <div
       className="rounded-2xl border border-line bg-mist p-3 sm:p-4"
       role="img"
-      aria-label="Animated demo: a feed of Reels. For each one, Healthy Scroll asks Jev about its caption and checks its frames against the prompt; if the frames are unsure a vision model takes a closer look. Reels that match the prompt are swiped away automatically."
+      aria-label="Illustrative demo: Healthy Scroll checks upcoming Reels with Jev while Gemini describes their images. Jev uses the text and descriptions to decide what matches your prompt."
     >
       <div className="grid gap-3 sm:gap-4 lg:grid-cols-[minmax(0,260px)_1fr]">
         <Feed frame={frame} still={i === null} />
@@ -312,17 +287,19 @@ function Trace({ lines, clip }: { lines: Line[]; clip: Clip }) {
 
       <ol className="mt-3 flex flex-col gap-3">
         {lines.map((l, idx) => (
-          <li key={`${l.stage}-${l.pending ? "p" : "d"}`} className="grid grid-cols-[64px_1fr] gap-3 animate-fade-up">
+          <li key={idx} className="grid grid-cols-[64px_1fr] gap-3 animate-fade-up">
             <span className="pt-px text-[11px] uppercase tracking-wider text-faint">{l.stage}</span>
             <div className="min-w-0">
               <div className="flex flex-wrap items-baseline gap-x-2">
-                <span className={l.stage === "text" ? "text-accent-ink" : "text-muted"}>{MODEL[l.stage]}</span>
+                <span className={l.model === "jev" ? "text-accent-ink" : "text-muted"}>{l.model}</span>
                 <span className={`min-w-0 ${l.pending ? "text-faint" : "text-ink"}`}>
                   {l.body}
                   {l.pending && <Dots />}
                 </span>
               </div>
-              {l.p !== undefined && l.verdict && <Meter p={l.p} verdict={l.verdict} ms={l.ms} />}
+              {l.p !== undefined && l.verdict && (
+                <Meter p={l.p} verdict={l.verdict} ms={l.ms} />
+              )}
             </div>
           </li>
         ))}
@@ -335,7 +312,7 @@ function Trace({ lines, clip }: { lines: Line[]; clip: Clip }) {
       </ol>
 
       <div className="mt-auto flex items-center justify-between gap-3 border-t border-line pt-3 text-[11px] text-faint">
-        <span>frames checked on our server, never stored</span>
+        <span>Reel images analyzed on the server</span>
         <span className="flex items-center gap-3">
           <Key color="bg-keep" label="keep" />
           <Key color="bg-faint" label="look closer" />

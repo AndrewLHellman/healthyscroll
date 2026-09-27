@@ -1,13 +1,12 @@
-import type { Decision, EvaluateRequest } from "@healthyscroll/shared";
 import type { PlaygroundClip } from "./clips";
 
 /**
  * How the prompt playground turns a prompt into one probability per clip.
  *
- * Two implementations: a keyword lookup that runs in the browser (demo default)
- * and the real thing, which sends each clip through `/api/evaluate` → Jev.
- * The component doesn't know which one it has. Switch with
- * `NEXT_PUBLIC_PLAYGROUND_SCORER=jev` in `apps/web/.env.local`.
+ * The real thing sends the prompt to `/api/playground`, which runs every clip
+ * through Jev server-side. A keyword lookup that runs in the browser stands in
+ * when that route is unavailable (local dev without a gateway key, gateway
+ * down, rate limited); the component switches over and says so.
  */
 export interface Scorer {
   id: "keyword" | "jev";
@@ -16,9 +15,33 @@ export interface Scorer {
   /**
    * One probability per clip, same order as `clips`. `null` means "couldn't
    * score this one" — shown as a dash, never as a skip (same rule as the extension).
+   * Rejects when the scorer as a whole is unavailable.
    */
   score(prompt: string, clips: PlaygroundClip[], signal: AbortSignal): Promise<(number | null)[]>;
 }
+
+/* --------------------------------------------------------------- live jev */
+
+/**
+ * One request for the whole strip; the server fans out to Jev with text +
+ * vision description per clip, the fully-informed pass of the pipeline.
+ */
+export const jevScorer: Scorer = {
+  id: "jev",
+  debounceMs: 600,
+  async score(prompt, clips, signal) {
+    const res = await fetch("/api/playground", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ prompt }),
+      signal,
+    });
+    if (!res.ok) throw new Error(`playground ${res.status}`);
+    const { scores } = (await res.json()) as { scores: (number | null)[] };
+    if (!Array.isArray(scores) || scores.length !== clips.length) throw new Error("playground: bad response");
+    return scores;
+  },
+};
 
 /* ----------------------------------------------------------- keyword mock */
 
@@ -49,44 +72,3 @@ export const keywordScorer: Scorer = {
     return clips.map((c) => (c.mock.tags.some((t) => active.has(t)) ? c.mock.hit : c.mock.miss));
   },
 };
-
-/* --------------------------------------------------------------- live jev */
-
-/**
- * One request per clip, in parallel, through the same route the extension
- * uses. Text + the frame caption, so it's the "visual" stage of the pipeline —
- * the fully-informed answer, not the 200 ms first pass.
- */
-export const jevScorer: Scorer = {
-  id: "jev",
-  debounceMs: 600,
-  async score(prompt, clips, signal) {
-    return Promise.all(
-      clips.map(async (c) => {
-        const body: EvaluateRequest = {
-          policy: { prompt },
-          context: c.context,
-          frames: [{ videoId: c.context.videoId, atMs: 0, caption: c.frameCaption }],
-        };
-        try {
-          const res = await fetch("/api/evaluate", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify(body),
-            signal,
-          });
-          if (!res.ok) return null;
-          const d = (await res.json()) as Decision;
-          return d.violatesProbability;
-        } catch (err) {
-          if (signal.aborted) throw err;
-          return null;
-        }
-      }),
-    );
-  },
-};
-
-export function getScorer(): Scorer {
-  return process.env.NEXT_PUBLIC_PLAYGROUND_SCORER === "jev" ? jevScorer : keywordScorer;
-}
