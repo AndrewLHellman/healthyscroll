@@ -132,10 +132,23 @@ function judge(info: ReelInfo, policy: UserPolicy, force = false): ReelRecord {
   return record;
 }
 
-/** Jev's category for the tally ("Your week"); a low-confidence guess counts as "other". */
-function noteCategory(code: string, decision: Decision): void {
-  const c = decision.category;
-  if (c) rememberCategory(code, c.probability >= MIN_CATEGORY_PROBABILITY ? c.label : "other");
+/**
+ * Jev's category for the tally ("Your week"). Every pass answers it; keep the most
+ * confident one, since the text+description passes see much more than a caption
+ * that is often empty. A low-confidence guess counts as "other".
+ */
+function categoryNoter(code: string): (decision: Decision) => void {
+  let best = 0;
+  return (decision) => {
+    const c = decision.category;
+    if (!c || c.probability < best) return;
+    best = c.probability;
+    rememberCategory(code, c.probability >= MIN_CATEGORY_PROBABILITY ? c.label : "other");
+  };
+}
+
+function categoryTag(d: Decision): string {
+  return d.category ? ` cat=${d.category.label} ${d.category.probability.toFixed(2)}` : "";
 }
 
 async function decide(info: ReelInfo, context: VideoContext, policy: UserPolicy): Promise<Judgement> {
@@ -146,20 +159,20 @@ async function decide(info: ReelInfo, context: VideoContext, policy: UserPolicy)
     // Switched on with no prompt: nothing to skip, but still ask Jev what the Reel is
     // about so "Your week" works. The server forces allow when there's no policy.
     const d = await evaluate({ policy: { prompt: "" }, context });
-    noteCategory(info.code, d);
-    return { verdict: "allow", stage: "none", reason: "no policy (category only)" };
+    categoryNoter(info.code)(d);
+    return { verdict: "allow", stage: "none", reason: `no policy (category only)${categoryTag(d)}` };
   }
 
   const hasMedia = Boolean(info.manifest || info.videoUrl);
   const t0 = performance.now();
   const ms = () => `${Math.round(performance.now() - t0)}ms`;
+  const noteCategory = categoryNoter(info.code);
 
   console.log(`[reels] ${info.code} jev(text) ->`);
   const textP = evaluate({ policy: { prompt: policy.prompt }, context });
-  // The category rides on the text pass; keep it whichever pass decides.
-  textP.then((d) => noteCategory(info.code, d), () => {});
+  textP.then(noteCategory, () => {});
   textP.then(
-    (d) => console.log(`[reels] ${info.code} jev(text) <- ${d.verdict} p=${d.violatesProbability.toFixed(2)} in ${ms()}`),
+    (d) => console.log(`[reels] ${info.code} jev(text) <- ${d.verdict} p=${d.violatesProbability.toFixed(2)}${categoryTag(d)} in ${ms()}`),
     (err) => console.warn(`[reels] ${info.code} jev(text) failed after ${ms()}`, err),
   );
 
@@ -189,7 +202,8 @@ async function decide(info: ReelInfo, context: VideoContext, policy: UserPolicy)
             context,
             frames: [{ videoId: info.id, atMs: 0, caption: text }],
           });
-          console.log(`[reels] ${info.code} jev(text+description) <- ${d.verdict} p=${d.violatesProbability.toFixed(2)} in ${ms()}`);
+          console.log(`[reels] ${info.code} jev(text+description) <- ${d.verdict} p=${d.violatesProbability.toFixed(2)}${categoryTag(d)} in ${ms()}`);
+          noteCategory(d);
           last = {
             verdict: d.verdict === "skip" ? "skip" : "allow",
             stage: "visual",

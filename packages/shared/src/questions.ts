@@ -53,7 +53,8 @@ export const jevQuestions = {
     instructions:
       "Which single category best describes what this video is about? Use the description, " +
       "hashtags, audio, comments and any visual captions. Ignore the policy entirely for this question. " +
-      "Pick 'other' only if nothing else fits.",
+      "Every video fits somewhere: choose the closest category even when the video mixes several or " +
+      "the text is sparse, and pick 'other' only when none is even close.",
     criteria: CATEGORIES,
   },
 } as const;

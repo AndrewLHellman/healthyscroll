@@ -31,8 +31,12 @@ export const MIN_VIEW_SECONDS = 1;
 /** A Reel looping on a phone left on the table stops counting after this. */
 export const MAX_VIEW_SECONDS = 180;
 
-/** Below this confidence Jev's category is a guess; count the Reel as "other". */
-export const MIN_CATEGORY_PROBABILITY = 0.35;
+/**
+ * Below this confidence Jev's category is a guess; count the Reel as "other".
+ * Jev's `choice` is already the most likely of ~20 categories, so its probability
+ * is spread thin: 0.35 sent over half of a real week to "other" (2026-09-27).
+ */
+export const MIN_CATEGORY_PROBABILITY = 0.2;
 
 /**
  * Upper bounds (seconds) of the watch-time buckets. Counting watched Reels per
