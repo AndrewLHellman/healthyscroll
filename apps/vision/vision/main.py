@@ -2,7 +2,8 @@
 Healthy Scroll vision service.
 
     POST /describe                   Reel media -> a short description of what's in it
-    GET  /media/{platform}/{videoId} poll for that description if it wasn't ready in time
+    GET  /media/{platform}/{videoId} the description so far; ?wait=s&seen=stage holds the
+                                     request until there's a newer one (long poll)
     GET  /health
 
 The service makes no decisions. It turns a Reel's video into text, once, shared
@@ -17,7 +18,7 @@ Flow (see apps/vision/README.md), per Reel, once, in two stages that run togethe
           ~1 frame / 3 s (max 3) from it with ffmpeg, describe poster + frames.
           This one is final.                                             (~1.7 s)
 /describe waits up to CAPTION_WAIT_S for the *first* description; the client
-polls /media/... for the final one only if it still needs it (Jev was unsure).
+long-polls /media/... for the next one only if it still needs it (Jev was unsure).
 Most Reels are settled on the poster alone and the frames stage is just filling
 the shared cache.
 
@@ -33,6 +34,7 @@ import asyncio
 import logging
 import time
 from collections import defaultdict, deque
+from collections.abc import Callable
 from contextlib import asynccontextmanager
 from typing import Literal
 
@@ -55,8 +57,10 @@ store = MediaStore()
 # Generation cost grows with visual tokens; 4 spread-out frames tell the story.
 CAPTION_MAX_FRAMES = 4
 # How long /describe holds the request for the first description before handing
-# the client off to polling. A gateway poster caption takes ~0.8 s, a laptop GPU 3-7 s.
+# the client off to polling. A gateway poster caption takes ~1.3 s, a laptop GPU 3-7 s.
 CAPTION_WAIT_S = 8.0
+# Longest a GET /media/... may be held waiting for a better description (long poll).
+MEDIA_WAIT_MAX_S = 10.0
 
 
 @asynccontextmanager
@@ -232,10 +236,10 @@ def _ensure_stages(media: Media, source: VideoSource) -> None:
         media.frames_task = asyncio.create_task(_frames_stage(media, source))
 
 
-async def _wait_for_first_caption(media: Media, timeout: float) -> None:
-    """Return once any stage has written a description, nothing is running any more, or time is up."""
+async def _wait_until(media: Media, done: Callable[[], bool], timeout: float) -> None:
+    """Return once `done()` holds, nothing is running any more, or time is up."""
     deadline = time.perf_counter() + timeout
-    while media.caption is None and media.caption_status == "pending":
+    while not done() and media.caption_status == "pending":
         remaining = deadline - time.perf_counter()
         if remaining <= 0:
             return
@@ -276,7 +280,7 @@ async def describe(req: DescribeRequest, request: Request, authorization: str | 
     # A malformed manifest or unreachable video surfaces as the frames stage failing;
     # the poster stage still answers if there was a poster.
     _ensure_stages(media, source)
-    await _wait_for_first_caption(media, CAPTION_WAIT_S - (time.perf_counter() - started))
+    await _wait_until(media, lambda: media.caption is not None, CAPTION_WAIT_S - (time.perf_counter() - started))
 
     res = DescribeResponse(
         videoId=req.videoId,
@@ -297,12 +301,24 @@ async def describe(req: DescribeRequest, request: Request, authorization: str | 
 
 
 @app.get("/media/{platform}/{video_id}", response_model=MediaResponse)
-async def media_status(platform: str, video_id: str, request: Request, authorization: str | None = Header(default=None)):
+async def media_status(
+    platform: str,
+    video_id: str,
+    request: Request,
+    authorization: str | None = Header(default=None),
+    # Long poll: hold the request up to `wait` seconds until the description is
+    # from a newer stage than `seen` (or nothing more is coming). Saves the client
+    # a poll interval per stage; ~0.35 s on the final verdict at 700 ms polling.
+    wait: float = 0.0,
+    seen: CaptionStage | None = None,
+):
     who = await _caller(request, authorization)
     _rate_limit(who, bucket="poll", per_min=settings.rate_per_min * 5)  # cheap dict lookup; clients poll
     media = store.get(_media_key(platform, video_id))
     if media is None:
         raise HTTPException(status_code=404, detail="unknown reel; POST /describe first")
+    if wait > 0:
+        await _wait_until(media, lambda: media.stage != seen and media.caption is not None, min(wait, MEDIA_WAIT_MAX_S))
     return MediaResponse(
         videoId=video_id,
         frames=_image_count(media),

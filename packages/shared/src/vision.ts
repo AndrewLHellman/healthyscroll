@@ -15,8 +15,9 @@
  *   2. Each time a (better) description arrives, POST /api/evaluate again with
  *      frames: [{ caption }] — text plus what's on screen. "skip" skips and the
  *      client stops looking; otherwise it waits for the next description.
- *   3. While captionStatus is "pending" more may come: poll
- *      GET {vision}/media/instagram/:videoId. "ready"/"failed" -> nothing more.
+ *   3. While captionStatus is "pending" more may come: long-poll
+ *      GET {vision}/media/instagram/:videoId?wait=<s>&seen=<stage> — the server
+ *      holds it until a newer stage has a caption. "ready"/"failed" -> nothing more.
  *      Any error or timeout -> the last answer stands (never skip on error).
  */
 export interface VisionDescribeRequest {

@@ -30,13 +30,15 @@ export interface Description {
 
 /**
  * The Reel's descriptions as the service produces them: usually the cover image
- * alone first (~1 s), then poster + video frames (~2 s). Yields each new one and
+ * alone first (~1.5 s), then poster + video frames (~2 s). Yields each new one and
  * ends when the service says nothing more is coming, on error, or at timeoutMs.
+ * Waiting for the next one is a long poll: GET /media?wait=&seen= is held by the
+ * server until a newer stage lands, so it arrives as soon as it exists.
  * Never throws. Stop consuming (break/return) to stop polling.
  */
 export async function* describeStream(
   req: VisionDescribeRequest,
-  { timeoutMs = 20_000, intervalMs = 700 } = {},
+  { timeoutMs = 20_000, waitS = 8 } = {},
 ): AsyncGenerator<Description> {
   const started = performance.now();
   const elapsed = () => `${Math.round(performance.now() - started)}ms`;
@@ -69,12 +71,19 @@ export async function* describeStream(
       console.warn(`[vision] ${req.videoId} still pending after ${polls} poll(s); giving up at ${elapsed()}`);
       return;
     }
-    await new Promise((r) => setTimeout(r, intervalMs));
     try {
       polls++;
-      const res = await authedFetch(`${VISION_BASE_URL}/media/${req.platform}/${encodeURIComponent(req.videoId)}`);
+      const params = new URLSearchParams({ wait: String(waitS) });
+      if (yieldedStage) params.set("seen", yieldedStage);
+      const sent = Date.now();
+      const res = await authedFetch(
+        `${VISION_BASE_URL}/media/${req.platform}/${encodeURIComponent(req.videoId)}?${params}`,
+      );
       if (!res.ok) return;
       last = (await res.json()) as VisionMediaResponse;
+      // A server that doesn't hold the request (older build) would make this a hot loop.
+      const nothingNew = last.captionStatus === "pending" && (last.stage ?? null) === (yieldedStage ?? null);
+      if (nothingNew && Date.now() - sent < 300) await new Promise((r) => setTimeout(r, 500));
     } catch {
       return;
     }
