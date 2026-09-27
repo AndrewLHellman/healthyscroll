@@ -7,11 +7,15 @@ representation and hand its URL to ffmpeg with `-ss` *before* `-i`, so ffmpeg
 reads the index and fetches only the bytes around each timestamp (HTTP range
 requests). The same path works for a plain progressive MP4 URL or a local file.
 
-Frames: one every VISION_FRAME_EVERY_S (default 2 s), at most VISION_MAX_FRAMES (8),
-plus the poster image as frame 0 when given. ffmpeg runs once per timestamp, in
-parallel threads. (Threads rather than
-asyncio subprocesses: the latter needs the Proactor loop on Windows, which
-uvicorn doesn't always use.)
+Frames: one every VISION_FRAME_EVERY_S (default 3 s), at most VISION_MAX_FRAMES (4),
+plus the poster image as frame 0 when given. One ffmpeg process per Reel reads
+the video from the first timestamp to the last in a single connection and emits
+every Nth second as a JPEG. (One process per timestamp, each with its own TLS
+handshake + index fetch + seek to a CDN on the other side of the world, took
+5-7 s per Reel on the server, 2026-09-27; the VLM itself takes < 1 s.)
+Explicit timestamps (benchmarks) still use one seek per timestamp.
+ffmpeg runs in threads rather than asyncio subprocesses: the latter needs the
+Proactor loop on Windows, which uvicorn doesn't always use.
 """
 
 from __future__ import annotations
@@ -122,19 +126,54 @@ def _parse_iso_duration(value: str | None) -> float | None:
     return seconds
 
 
-def _grab_one(input_: str, t: float, long_side: int, is_remote: bool) -> Image.Image | None:
-    # Scale so the longer side is `long_side` (Reels are portrait; this keeps landscape sane too).
-    scale = f"scale='if(gt(iw,ih),{long_side},-2)':'if(gt(iw,ih),-2,{long_side})'"
+def _ffmpeg_cmd(input_: str, start: float, is_remote: bool) -> list[str]:
     cmd = [settings.ffmpeg, "-hide_banner", "-loglevel", "error", "-nostdin"]
     if is_remote:
         cmd += ["-user_agent", USER_AGENT, "-rw_timeout", "8000000"]
         cmd += ["-protocol_whitelist", "file,http,https,tcp,tls,crypto"]
-    cmd += ["-ss", f"{t:.3f}", "-i", input_, "-frames:v", "1", "-vf", scale]
-    cmd += ["-f", "image2pipe", "-vcodec", "mjpeg", "-q:v", "3", "pipe:1"]
+    # -ss before -i: seek in the container index, don't decode from 0.
+    return cmd + ["-ss", f"{start:.3f}", "-i", input_]
+
+
+def _scale_filter(long_side: int) -> str:
+    # Scale so the longer side is `long_side` (Reels are portrait; this keeps landscape sane too).
+    return f"scale='if(gt(iw,ih),{long_side},-2)':'if(gt(iw,ih),-2,{long_side})'"
+
+
+_MJPEG_OUT = ["-f", "image2pipe", "-vcodec", "mjpeg", "-q:v", "3", "pipe:1"]
+_JPEG_SOI = b"\xff\xd8\xff"
+
+
+def _grab_one(input_: str, t: float, long_side: int, is_remote: bool) -> Image.Image | None:
+    cmd = _ffmpeg_cmd(input_, t, is_remote) + ["-frames:v", "1", "-vf", _scale_filter(long_side)] + _MJPEG_OUT
     proc = subprocess.run(cmd, capture_output=True, timeout=FFMPEG_TIMEOUT_S)
     if proc.returncode != 0 or not proc.stdout:
         return None
     return Image.open(BytesIO(proc.stdout)).convert("RGB")
+
+
+def _grab_every(
+    input_: str, start: float, step: float, count: int, long_side: int, is_remote: bool
+) -> list[Image.Image]:
+    """`count` frames at start, start+step, ... from one ffmpeg run (one connection, one decode)."""
+    # select: the first frame, then the first frame at least `step` after the last
+    # selected one. (Not the fps filter: it waits for the frame *after* each slot,
+    # so the last one never arrives within -t.)
+    select = f"select='isnan(prev_selected_t)+gte(t-prev_selected_t\\,{step:g})'"
+    cmd = _ffmpeg_cmd(input_, start, is_remote)
+    cmd += ["-t", f"{step * (count - 1) + 0.6:.3f}", "-frames:v", str(count)]
+    cmd += ["-vf", f"{select},{_scale_filter(long_side)}", "-fps_mode", "passthrough"] + _MJPEG_OUT
+    proc = subprocess.run(cmd, capture_output=True, timeout=FFMPEG_TIMEOUT_S)
+    if not proc.stdout:
+        return []  # a non-zero exit with some frames out (e.g. short video) is still useful
+    images: list[Image.Image] = []
+    # An MJPEG stream is just JPEGs back to back; SOI can't occur inside a JPEG.
+    for chunk in proc.stdout.split(_JPEG_SOI)[1:]:
+        try:
+            images.append(Image.open(BytesIO(_JPEG_SOI + chunk)).convert("RGB"))
+        except OSError:
+            break  # truncated last frame
+    return images[:count]
 
 
 def _fetch_poster(url: str, long_side: int) -> Image.Image | None:
@@ -176,18 +215,27 @@ async def extract_frames(
         else:
             raise ValueError("VideoSource needs manifest, url or path")
 
-        if timestamps:
-            # Explicit timestamps: still don't ask for frames past the end.
-            timestamps = [t for t in timestamps if not duration or t < duration - 0.1] or [0.5]
-        else:
-            timestamps = sample_timestamps(duration)
-
         poster_task = (
             asyncio.to_thread(_fetch_poster, source.poster_url, long_side) if source.poster_url else None
         )
-        results = await asyncio.gather(
-            *(asyncio.to_thread(_grab_one, input_, t, long_side, remote) for t in timestamps)
-        )
+        if timestamps:
+            # Explicit timestamps: still don't ask for frames past the end.
+            timestamps = [t for t in timestamps if not duration or t < duration - 0.1] or [0.5]
+            results = await asyncio.gather(
+                *(asyncio.to_thread(_grab_one, input_, t, long_side, remote) for t in timestamps)
+            )
+        else:
+            timestamps = sample_timestamps(duration)
+            step = settings.frame_every_s
+            if len(timestamps) == 1:
+                results = [await asyncio.to_thread(_grab_one, input_, timestamps[0], long_side, remote)]
+            else:
+                images = await asyncio.to_thread(
+                    _grab_every, input_, timestamps[0], step, len(timestamps), long_side, remote
+                )
+                # A short video yields fewer frames; they're the leading ones.
+                timestamps = timestamps[: len(images)]
+                results = list(images)
         poster = await poster_task if poster_task else None
     finally:
         if tmp_manifest:

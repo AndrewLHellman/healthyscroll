@@ -23,9 +23,11 @@ class Settings:
     quantize: bool = os.getenv("VISION_QUANTIZE", "true").lower() == "true"
 
     # Sample one frame every N seconds (starting at 0.5 s), capped. The poster
-    # image, when the client sends one, is prepended as an extra frame.
-    frame_every_s: float = float(os.getenv("VISION_FRAME_EVERY_S", "2"))
-    max_frames: int = int(os.getenv("VISION_MAX_FRAMES", "8"))
+    # image, when the client sends one, is prepended as an extra frame. The
+    # captioner only looks at 4 frames (main.CAPTION_MAX_FRAMES); more just costs
+    # download and decode time.
+    frame_every_s: float = float(os.getenv("VISION_FRAME_EVERY_S", "3"))
+    max_frames: int = int(os.getenv("VISION_MAX_FRAMES", "4"))
     # Frames are scaled so the long side is this many pixels. Small VLMs are tuned
     # for ~384-512 px; bigger only adds visual tokens and latency.
     frame_long_side: int = int(os.getenv("VISION_FRAME_SIZE", "448"))
