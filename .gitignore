@@ -24,4 +24,10 @@ out/
 # safari extension build (referenced by apps/ios)
 apps/extension/dist-safari/
 xcuserdata/
-demo.gif
+
+# demo footage and renders (raw clips, prompt screenshots, assembled videos)
+/*.mp4
+/*.mov
+/*.gif
+/instagram-demo/
+/technical/

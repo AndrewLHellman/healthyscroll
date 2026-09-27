@@ -12,5 +12,5 @@ while IFS=' ' read -r slug w h; do
   # headless Chrome loses ~88px of the window to chrome, so shoot tall and crop to size.
   magick "/tmp/hs-$slug.png" -crop "$((w * 2))x$((h * 2))+0+0" +repage "$out/$slug.png"
   echo "$out/$slug.png"
-done < <(grep -oE 'slug: "[a-z-]+".*size: (OG|SQUARE|DEVPOST)' components/frames/index.tsx \
-  | sed -E 's/slug: "([a-z-]+)".*size: OG/\1 1200 630/; s/slug: "([a-z-]+)".*size: SQUARE/\1 1080 1080/; s/slug: "([a-z-]+)".*size: DEVPOST/\1 1500 1000/')
+done < <(grep -oE 'slug: "[a-z-]+".*size: (OG|SQUARE|DEVPOST|VIDEO)' components/frames/index.tsx \
+  | sed -E 's/slug: "([a-z-]+)".*size: OG/\1 1200 630/; s/slug: "([a-z-]+)".*size: SQUARE/\1 1080 1080/; s/slug: "([a-z-]+)".*size: DEVPOST/\1 1500 1000/; s/slug: "([a-z-]+)".*size: VIDEO/\1 1920 1080/')

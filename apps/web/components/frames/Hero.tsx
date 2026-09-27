@@ -1,6 +1,5 @@
 import { PixelHeart } from "@/components/Mark";
-import { Footage } from "@/components/Footage";
-import { BigWordmark, Frame, OG } from "./shared";
+import { BigWordmark, Frame, OG, SkippedReel } from "./shared";
 
 /** Default OG image: headline + one skipped Reel. */
 export function Hero() {
@@ -29,28 +28,8 @@ export function Hero() {
         </p>
       </div>
 
-      {/* One Reel on its way out, with the decision that sent it. */}
-      <div className="absolute right-14 top-[108px] w-[236px]">
-        <div className="relative aspect-[9/16] overflow-hidden rounded-xl bg-ink shadow-[0_40px_80px_-40px_rgba(18,20,26,0.5)]">
-          <Footage tone={["#3b1d5a", "#0f0c1a"]} className="h-full">
-            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-4 pt-16 text-white">
-              <p className="text-sm font-semibold">@spinsdaily</p>
-              <p className="mt-1 text-sm leading-snug text-white/90">late night spins hit different 🎰 #slots #bigwin</p>
-              <p className="mt-2 text-xs text-white/70">♪ original sound</p>
-            </div>
-          </Footage>
-          <div className="absolute left-1/2 top-4 -translate-x-1/2 rounded-full bg-skip px-3 py-1 font-mono text-[11px] font-medium text-white shadow-lg">
-            skipped
-          </div>
-        </div>
-        <div className="absolute -left-[150px] top-[150px] w-[300px] rounded-xl border border-line bg-paper p-4 shadow-[0_24px_60px_-28px_rgba(18,20,26,0.35)]">
-          <p className="flex items-center gap-2 text-[13px] text-muted">
-            <span className="h-2 w-2 rounded-full bg-skip" /> Skipped because it matched
-          </p>
-          <p className="mt-2 text-[15px] leading-snug">
-            It matched your prompt: <span className="font-medium">“gambling”</span>
-          </p>
-        </div>
+      <div className="absolute right-14 top-[108px]">
+        <SkippedReel />
       </div>
     </Frame>
   );
