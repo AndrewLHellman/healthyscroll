@@ -24,3 +24,4 @@ out/
 # safari extension build (referenced by apps/ios)
 apps/extension/dist-safari/
 xcuserdata/
+demo.gif

@@ -17,14 +17,14 @@ const TOP_N = 5;
 const WEEKDAY = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 export function WeekMock() {
-  return <WeekView week={buildMockWeek()} />;
+  return <WeekView week={buildMockWeek()} title="Insights" />;
 }
 
 /**
  * The "Your week" panel for any Summary: the landing page's mock, or the
  * dashboard's real week (summarizeDays over the synced daily totals).
  */
-export function WeekView({ week, note }: { week: Summary; note?: string }) {
+export function WeekView({ week, note, title = "Your week" }: { week: Summary; note?: string; title?: string }) {
   const first = week.days[0].date;
   const last = week.days[week.days.length - 1].date;
 
@@ -32,7 +32,7 @@ export function WeekView({ week, note }: { week: Summary; note?: string }) {
     <figure className="overflow-hidden rounded-2xl border border-line bg-paper shadow-[0_24px_60px_-32px_rgba(18,20,26,0.25)]">
       <header className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 border-b border-line px-6 py-4 sm:px-8">
         <p className="font-display text-lg font-semibold tracking-tight">
-          Your week
+          {title}
           <span className="ml-3 font-sans text-sm font-normal text-muted">
             {formatDuration(week.totalMs)} across {week.watched} videos
           </span>

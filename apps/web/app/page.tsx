@@ -92,7 +92,7 @@ function Week() {
     <section id="insights" className="border-t border-line bg-mist/60">
       <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 sm:py-28">
         <SectionHeading
-          eyebrow="Your week"
+          eyebrow="Insights"
           title="Get to know your scrolling habits."
           body="See which topics take up your time and which ones you tend to linger on. Your weekly summary can help you decide whether your feed is how you want to spend that time, and what you’d like to change."
         />

@@ -4,7 +4,7 @@ import { AuthButton } from "@/app/AuthButton";
 const LINKS = [
   { href: "/#getting-started", label: "Getting started" },
   { href: "/#prompts", label: "Prompts" },
-  { href: "/#insights", label: "Your week" },
+  { href: "/#insights", label: "Insights" },
   { href: "/#faq", label: "FAQ" },
 ];
 

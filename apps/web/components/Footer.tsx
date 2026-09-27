@@ -15,7 +15,7 @@ const COLUMNS = [
       { label: 'Getting started', href: '/#getting-started' },
       { label: 'Dashboard', href: '/dashboard' },
       { label: 'Prompt playground', href: '/#prompts' },
-      { label: 'Your week', href: '/#insights' },
+      { label: 'Insights', href: '/#insights' },
       { label: 'Privacy', href: '/#faq' },
       { label: 'FAQ', href: '/#faq' },
     ],
