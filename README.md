@@ -1,6 +1,6 @@
 # Healthy Scroll
 
-![Healthy Scroll demo](asset.gif)
+![Healthy Scroll demo](apps/web/public/graphics/asset.gif)
 
 **Your prompt, your feed.** Healthy Scroll skips short-form videos that conflict with a policy you write in plain English. The primary target is **Instagram Reels on instagram.com in Safari on iPhone**, with Instagram Reels in desktop Chrome as the secondary target. It does not work inside the Instagram app; YouTube Shorts support is planned.
 
