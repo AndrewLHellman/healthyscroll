@@ -73,11 +73,17 @@ export function onReelActive(tabId: number, code: string, policy: UserPolicy): v
     // Either the hook hasn't parsed this Reel yet (onReelsDiscovered will call
     // back), or this background was just (re)started and lost every judgement.
     // Ask the page to send it again; judge() dedupes if both arrive.
+    console.log(`[reels] active ${code}: no data, asking the page for it`);
     sendToTab(tabId, { type: "REEL_WANTED", code }).catch(() => {});
     return;
   }
   // Policy edited since this Reel was judged -> judge again.
   const current = record.policyPrompt === policy.prompt ? record : judge(record.info, policy, true);
+  console.log(
+    `[reels] active ${code}: ${
+      current !== record ? "policy changed, judging again" : current.settled ? `already ${current.settled.verdict} (${current.settled.stage}) ${current.settled.reason}` : "still judging"
+    }`,
+  );
   void current.judgement.then(async (j) => {
     if (j.verdict !== "skip" || activeByTab.get(tabId) !== code) return;
     // One skip per Reel per tab: a second message mid-scroll would skip two Reels.
