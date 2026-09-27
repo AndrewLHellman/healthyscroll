@@ -94,10 +94,6 @@ export function Popup() {
         {saved ? "Saved" : "Save"}
       </button>
 
-      <p className="text-[11px] text-neutral-400 leading-snug">
-        Video frames are analysed on your device. Only text and short captions leave your machine.
-      </p>
-
       <footer className="flex items-center justify-between gap-2 text-[11px] text-neutral-400">
         <span className="truncate">{auth.email}</span>
         <button
