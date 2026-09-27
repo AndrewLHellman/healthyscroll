@@ -128,9 +128,10 @@ export function PromptPlayground() {
           const v = verdicts[i];
           return (
             <li key={c.context.author} className={`w-[112px] shrink-0 transition-opacity sm:w-auto ${pending ? "opacity-70" : ""}`}>
-              <div className="relative">
+              <Tile href={c.reel?.href}>
                 <Footage
                   tone={c.tone}
+                  image={c.reel?.poster}
                   className={`aspect-[9/16] rounded-lg transition-all duration-500 ${v === "skip" ? "opacity-30 grayscale" : "opacity-100"}`}
                 >
                   <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-2 pt-8 text-white">
@@ -145,13 +146,23 @@ export function PromptPlayground() {
                 >
                   skipped
                 </div>
-              </div>
+              </Tile>
               <ScoreLine p={p} v={v} />
             </li>
           );
         })}
       </ul>
     </div>
+  );
+}
+
+/** A tile with a real Reel behind it opens that Reel. */
+function Tile({ href, children }: { href?: string; children: React.ReactNode }) {
+  if (!href) return <div className="relative">{children}</div>;
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer" className="relative block" title="Open on Instagram">
+      {children}
+    </a>
   );
 }
 

@@ -23,6 +23,9 @@ import type { EvaluateRequest } from "./types";
  */
 export const JEV_MODEL = "typesafe-ai/jev";
 
+/** Longest transcript Jev sees; ~30 s of speech is well under this. */
+export const MAX_TRANSCRIPT_CHARS = 4000;
+
 /** What `state.policy` holds when the user hasn't written anything. Jev should never flag against it. */
 export const NO_POLICY = "(none — the user has not written a policy; nothing violates it)";
 
@@ -38,7 +41,7 @@ export const jevQuestions = {
     instructions:
       "`policy` lists topics the viewer does not want to see. Is this short video about, or does it " +
       "feature, any of those topics? Judge from the video's description, hashtags, author, audio title, " +
-      "comments and visual captions. A topic is featured when a person, thing or subject named in the " +
+      "comments, visual captions and audio transcript. A topic is featured when a person, thing or subject named in the " +
       "policy is visibly present in the video, even if the video is mainly about something else. " +
       "If the policy is empty or says none was written, the answer is false.",
     criteria: {
@@ -52,7 +55,7 @@ export const jevQuestions = {
     type: "choice",
     instructions:
       "Which single category best describes what this video is about? Use the description, " +
-      "hashtags, audio, comments and any visual captions. Ignore the policy entirely for this question. " +
+      "hashtags, audio, comments, any visual captions and any audio transcript. Ignore the policy entirely for this question. " +
       "Every video fits somewhere: choose the closest category even when the video mixes several or " +
       "the text is sparse, and pick 'other' only when none is even close.",
     criteria: CATEGORIES,
@@ -64,7 +67,7 @@ export const jevQuestions = {
  * Order matters slightly for readability, not for the model.
  */
 export function buildJevState(req: EvaluateRequest) {
-  const { policy, context, frames } = req;
+  const { policy, context, frames, transcript } = req;
   // Jev rejects state that isn't strictly JSON-compatible, and `undefined`
   // fields (no comments, no frames on the text pass...) count. Drop them.
   return withoutUndefined({
@@ -76,6 +79,8 @@ export function buildJevState(req: EvaluateRequest) {
       audioTitle: context.audioTitle,
       onScreenText: context.onScreenText,
       comments: context.comments?.slice(0, 20),
+      // Only on the last-resort audio pass: what's said in the Reel.
+      audioTranscript: transcript?.trim().slice(0, MAX_TRANSCRIPT_CHARS) || undefined,
     },
     // Only present on visual/monitor passes.
     visualFrames: frames?.map((f) => ({

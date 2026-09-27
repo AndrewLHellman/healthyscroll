@@ -38,6 +38,29 @@ extension ─POST /describe─▶ vision ──────▶│ stage "poster"
   is benchmark-only now; the service itself only calls `describe()`.
 - **Contract:** `packages/shared/src/vision.ts` (request/response + the client flow).
 
+## Last resort: `POST /transcribe` (ElevenLabs)
+
+When a Reel's text + description still leave Jev unsure (0.2 < p < 0.8), and
+only once that Reel is on screen, the extension asks for what's *said* in it:
+
+```
+extension ─POST /transcribe─▶ vision: smallest audio track from the DASH manifest,
+                                      first 30 s in one range request (~250 KB)
+                                      → ffmpeg → 16 kHz mono PCM
+                              ─────▶ ElevenLabs Scribe v2 → transcript (cached per Reel)
+extension ─POST /api/evaluate { …, frames: [description], transcript } → Jev decides (final)
+```
+
+- Costs money ($0.22 per hour of audio, ~$0.0018 per 30 s Reel), so it's capped:
+  `TRANSCRIBE_MAX_S` seconds per Reel, `TRANSCRIBE_PER_USER_DAY` and
+  `TRANSCRIBE_DAILY_MAX` new transcriptions per UTC day (cache hits are free;
+  429 past the cap). Set a credit limit on the key in the ElevenLabs dashboard too.
+- Reels using a licensed song are skipped by the extension (the transcript would be lyrics).
+- No `ELEVENLABS_API_KEY` → 503, and the extension keeps its earlier answer.
+- `GET /health` shows today's count, audio seconds and estimated cost.
+- Privacy: only the Reel's public audio is sent; nothing about the user. ElevenLabs'
+  zero-retention mode is Enterprise-only, so they may log it.
+
 ## Setup (Windows, from `apps/vision`)
 
 ```bash

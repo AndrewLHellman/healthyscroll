@@ -30,7 +30,7 @@ export interface SkipRow {
   user_id: string;
   platform: string;
   video_id: string;
-  stage: "text" | "visual" | "monitor";
+  stage: "text" | "visual" | "monitor" | "audio";
   violates_probability: number | null;
   skipped_at: string;
 }

@@ -199,6 +199,11 @@ if (DEBUG) {
     if (view?.code === code) view.skipped = true;
     void skipReel(code).then((how) => console.log("[healthyscroll] test skip:", how));
   });
+  // Run the last-resort audio pass (ElevenLabs) on the Reel on screen, even if Jev was sure.
+  window.addEventListener("hs:audio", () => {
+    const code = getActiveReelCode();
+    if (code) send({ type: "FORCE_AUDIO", code });
+  });
   // Today's watch totals on this device, plus views not yet sent to background.
   window.addEventListener("hs:tally", () => {
     const key = feedKey(dayKey(Date.now()));

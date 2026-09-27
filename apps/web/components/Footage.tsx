@@ -8,17 +8,21 @@ export const GRAIN =
 
 export function Footage({
   tone,
+  image,
   className = "",
   children,
 }: {
   tone: [string, string];
+  /** Optional real frame. Layered over the gradient, so a missing file just shows the gradient. */
+  image?: string;
   className?: string;
   children?: React.ReactNode;
 }) {
+  const gradient = `linear-gradient(160deg, ${tone[0]}, ${tone[1]})`;
   return (
     <div
       className={`relative overflow-hidden ${className}`}
-      style={{ background: `linear-gradient(160deg, ${tone[0]}, ${tone[1]})` }}
+      style={{ background: image ? `center / cover no-repeat url("${image}"), ${gradient}` : gradient }}
     >
       <div className="absolute inset-0 opacity-[0.18] mix-blend-overlay" style={{ backgroundImage: GRAIN }} aria-hidden />
       {children}

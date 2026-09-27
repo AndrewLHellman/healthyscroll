@@ -51,5 +51,20 @@ class Settings:
     # Local Moondream Station (optional scorer).
     moondream_url: str = os.getenv("MOONDREAM_URL", "http://localhost:2020/v1")
 
+    # ElevenLabs speech-to-text: the last-resort audio pass (POST /transcribe),
+    # only for Reels text + description left Jev unsure. Billed per second of
+    # audio ($0.22/hour on Scribe v2), so it's capped three ways below.
+    # No key -> /transcribe answers 503 and the extension keeps its earlier answer.
+    elevenlabs_api_key: str = os.getenv("ELEVENLABS_API_KEY", "")
+    elevenlabs_url: str = os.getenv("ELEVENLABS_URL", "https://api.elevenlabs.io")
+    elevenlabs_model: str = os.getenv("ELEVENLABS_STT_MODEL", "scribe_v2")
+    # Seconds of audio sent per Reel, from the start. Most Reels say what they're about early.
+    transcribe_max_s: float = float(os.getenv("TRANSCRIBE_MAX_S", "30"))
+    # New transcriptions (cache hits are free) per signed-in user per UTC day.
+    transcribe_per_user_day: int = int(os.getenv("TRANSCRIBE_PER_USER_DAY", "50"))
+    # New transcriptions per UTC day across everyone. A hard ceiling on the bill:
+    # 1000 x 30 s = 8.3 h = ~$1.83/day.
+    transcribe_daily_max: int = int(os.getenv("TRANSCRIBE_DAILY_MAX", "1000"))
+
 
 settings = Settings()

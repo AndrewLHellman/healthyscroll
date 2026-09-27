@@ -63,3 +63,45 @@ export interface VisionMediaResponse {
   caption?: string | null;
   stage?: VisionCaptionStage | null;
 }
+
+/**
+ * POST {vision}/transcribe — the last resort, after text + description left Jev
+ * unsure (0.2 < p < 0.8), and only for the Reel on screen. The server pulls the
+ * first ~30 s of the Reel's own audio track and has ElevenLabs Scribe write down
+ * what's said; the extension sends that to /api/evaluate as `transcript`, and
+ * Jev's answer is final. Cached per Reel for every user, like descriptions.
+ * Costs real money per call, so the server also caps calls per user and per day.
+ */
+export interface VisionTranscribeRequest {
+  videoId: string;
+  platform: "instagram" | "tiktok";
+  /** DASH MPD XML (its audio track is used). Send this or `videoUrl`, not both. */
+  manifest?: string;
+  /** Progressive MP4 URL, when there's no manifest. */
+  videoUrl?: string;
+}
+
+/**
+ * "ready" -> `transcript` is set (may be "" for a Reel with no speech).
+ * "pending" -> poll GET /transcript/... . "failed" -> give up.
+ */
+export type VisionTranscriptStatus = "none" | "pending" | "ready" | "failed";
+
+export interface VisionTranscribeResponse {
+  videoId: string;
+  transcriptStatus: VisionTranscriptStatus;
+  transcript?: string | null;
+  /** Seconds of audio sent to ElevenLabs (what's billed). */
+  audioSeconds?: number | null;
+  /** True when another user's request already transcribed this Reel. */
+  cached: boolean;
+  totalMs: number;
+  model: string;
+}
+
+/** GET /transcript/:platform/:videoId */
+export interface VisionTranscriptResponse {
+  videoId: string;
+  transcriptStatus: VisionTranscriptStatus;
+  transcript?: string | null;
+}

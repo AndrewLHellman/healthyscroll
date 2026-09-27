@@ -5,9 +5,11 @@ import { Footage } from "./Footage";
 import { PixelHeart } from "./Mark";
 
 /**
- * Looping, scripted trace of the real pipeline: a mock feed card on the left,
- * the decision log on the right. Probabilities are shown on a meter with the
- * two thresholds (0.2 / 0.8) so the mechanism is visible without explanation.
+ * Looping, scripted trace of the real pipeline: a Reels-style feed on the left
+ * that actually swipes, the decision log on the right. Probabilities are shown
+ * on a meter with the two thresholds (0.2 / 0.8) so the mechanism is visible
+ * without explanation. Covers are real Reels from public/playground/ (same as
+ * the prompt playground); handles and captions are illustrative.
  *
  * Under prefers-reduced-motion it renders one fully-resolved frame, static.
  */
@@ -20,7 +22,9 @@ interface Clip {
   author: string;
   desc: string;
   sound: string;
-  /** Two-stop gradient standing in for the video. */
+  /** Real Reel cover (public/playground/). */
+  image: string;
+  /** Fallback under the image while it loads. */
   tone: [string, string];
   text: { p: number; ms: number };
   visual?: { caption: string; p: number; ms: number };
@@ -31,32 +35,36 @@ const CLIPS: Clip[] = [
     author: "spinsdaily",
     desc: "late night spins hit different 🎰 #slots #bigwin",
     sound: "original sound",
+    image: "/playground/gambling.jpg",
     tone: ["#3b1d5a", "#0f0c1a"],
     text: { p: 0.96, ms: 184 },
   },
   {
     author: "trail.mornings",
-    desc: "6am loop before work. always worth it",
+    desc: "6am run before work. always worth it",
     sound: "Avril 14th · Aphex Twin",
+    image: "/playground/run.jpg",
     tone: ["#d9c7a3", "#5e6a4e"],
     text: { p: 0.03, ms: 171 },
-    visual: { caption: "a person running on a dirt trail at sunrise, trees on both sides", p: 0.02, ms: 1240 },
+    visual: { caption: "two people running along a seaside path under a cloudy sky", p: 0.02, ms: 1240 },
   },
   {
     author: "saturday.recap",
     desc: "and that was the night 🍾",
     sound: "trending audio",
+    image: "/playground/drinking.jpg",
     tone: ["#1b2a44", "#0a0e17"],
     text: { p: 0.54, ms: 203 },
-    visual: { caption: "a crowded bar, several people holding drinks and shot glasses", p: 0.92, ms: 1310 },
+    visual: { caption: "a man in a busy bar; on-screen text: ‘Also me after 3 margaritas’", p: 0.92, ms: 1310 },
   },
   {
     author: "ana.bakes",
-    desc: "focaccia, day 3. the dimples are the whole point",
+    desc: "flatbread + butter chicken, weeknight edition",
     sound: "Kitchen sounds",
+    image: "/playground/food.jpg",
     tone: ["#e8b27a", "#7a4a22"],
     text: { p: 0.02, ms: 158 },
-    visual: { caption: "hands pressing dimples into bread dough on a wooden counter", p: 0.01, ms: 1190 },
+    visual: { caption: "a tray of stuffed flatbreads topped with herbs", p: 0.01, ms: 1190 },
   },
 ];
 
@@ -106,7 +114,7 @@ function buildFrames(): Frame[] {
     push([textDone], textDone.verdict === "skip" ? 900 : 700);
 
     if (textDone.verdict === "skip") {
-      push([textDone], 520, "out", true);
+      push([textDone], 560, "out", true);
       return;
     }
 
@@ -125,15 +133,15 @@ function buildFrames(): Frame[] {
       push([textDone, mdDone], 600);
       push([textDone, mdDone, jevDone], jevDone.verdict === "skip" ? 900 : 1500);
       if (jevDone.verdict === "skip") {
-        push([textDone, mdDone, jevDone], 520, "out", true);
+        push([textDone, mdDone, jevDone], 560, "out", true);
         return;
       }
       // Kept: the user watches, then scrolls on themselves.
-      push([textDone, mdDone, jevDone], 480, "out", false);
+      push([textDone, mdDone, jevDone], 700, "out", false);
       return;
     }
 
-    push([textDone], 480, "out", false);
+    push([textDone], 700, "out", false);
   });
   return frames;
 }
@@ -170,57 +178,100 @@ export function PipelineDemo() {
       aria-label="Illustrative demo: Healthy Scroll checks upcoming Reels with Jev while Gemini describes their images. Jev uses the text and descriptions to decide what matches your prompt."
     >
       <div className="grid gap-3 sm:gap-4 lg:grid-cols-[minmax(0,260px)_1fr]">
-        <FeedCard clip={clip} card={frame.card} skipped={frame.skipped || i === null} clipIndex={frame.clip} />
+        <Feed frame={frame} still={i === null} />
         <Trace lines={frame.lines} clip={clip} />
       </div>
     </div>
   );
 }
 
-function FeedCard({
-  clip,
-  card,
-  skipped,
-  clipIndex,
-}: {
-  clip: Clip;
-  card: Frame["card"];
-  skipped: boolean;
-  clipIndex: number;
-}) {
+/**
+ * A vertical Reels feed. Every clip is a full-height card positioned by its
+ * distance from the current one: current at 0, next just below. On "out" both
+ * move up together, which is the swipe. Cards further away sit offscreen below
+ * with no transition, so the loop back to the first clip never slides across.
+ */
+function Feed({ frame, still }: { frame: Frame; still: boolean }) {
+  const n = CLIPS.length;
+  const out = frame.card === "out";
+  const skipped = frame.skipped || still;
+
   return (
     <div className="relative mx-auto aspect-[9/16] w-full max-w-[260px] overflow-hidden rounded-xl bg-ink lg:mx-0">
-      <Footage
-        key={clipIndex}
-        tone={clip.tone}
-        className={`absolute inset-0 animate-rise transition-all duration-500 ease-[cubic-bezier(0.2,0.7,0.2,1)] ${
-          card === "out" ? "-translate-y-full opacity-0" : "translate-y-0 opacity-100"
-        }`}
-      >
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-4 pt-16 text-white">
-          <p className="text-sm font-semibold">@{clip.author}</p>
-          <p className="mt-1 text-sm leading-snug text-white/90">{clip.desc}</p>
-          <p className="mt-2 flex items-center gap-1.5 text-xs text-white/70">
-            <span aria-hidden>♪</span> {clip.sound}
-          </p>
-        </div>
-        <div className="absolute right-3 top-1/2 flex -translate-y-1/2 flex-col gap-4 text-white/85" aria-hidden>
-          {[<PixelHeart key="h" size={18} color="#fff" />, "💬", "↗"].map((g, k) => (
-            <span key={k} className="grid h-8 w-8 place-items-center rounded-full bg-white/15 text-sm backdrop-blur">
-              {g}
-            </span>
-          ))}
-        </div>
-      </Footage>
+      {CLIPS.map((clip, idx) => {
+        const offset = (idx - frame.clip + n) % n;
+        const y = offset === 0 ? (out ? "-100%" : "0%") : offset === 1 ? (out ? "0%" : "100%") : "100%";
+        const moving = offset <= 1;
+        const current = offset === 0;
+        return (
+          <div
+            key={clip.author}
+            className="absolute inset-0"
+            style={{
+              transform: `translateY(${y})`,
+              // A skip is a quick flick; the viewer's own swipe is a little slower.
+              transition: moving
+                ? `transform ${frame.skipped ? 420 : 560}ms cubic-bezier(0.2, 0.7, 0.2, 1)`
+                : "none",
+            }}
+            aria-hidden={!current}
+          >
+            <Card clip={clip} playing={current && !out && !still} dimmed={current && skipped && (out || still)} />
+          </div>
+        );
+      })}
 
       <div
-        className={`absolute left-1/2 top-4 -translate-x-1/2 rounded-full bg-skip px-3 py-1 font-mono text-[11px] font-medium text-white shadow-lg transition-all duration-300 ${
-          skipped ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"
+        className={`absolute left-1/2 top-4 z-10 -translate-x-1/2 rounded-full bg-skip px-3 py-1 font-mono text-[11px] font-medium text-white shadow-lg transition-all duration-300 ${
+          skipped && (out || still) ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"
         }`}
       >
         skipped
       </div>
+      <div
+        className={`absolute bottom-24 left-1/2 z-10 -translate-x-1/2 rounded-full bg-black/55 px-3 py-1 font-mono text-[10px] text-white backdrop-blur transition-opacity duration-300 ${
+          out && !frame.skipped ? "opacity-100" : "opacity-0"
+        }`}
+        aria-hidden
+      >
+        ↑ you swiped
+      </div>
     </div>
+  );
+}
+
+function Card({ clip, playing, dimmed }: { clip: Clip; playing: boolean; dimmed: boolean }) {
+  return (
+    <Footage
+      tone={clip.tone}
+      image={clip.image}
+      className={`h-full w-full transition-[filter] duration-300 ${dimmed ? "brightness-75 grayscale" : ""}`}
+    >
+      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent p-4 pt-16 text-white">
+        <p className="text-sm font-semibold">@{clip.author}</p>
+        <p className="mt-1 text-sm leading-snug text-white/90">{clip.desc}</p>
+        <p className="mt-2 flex items-center gap-1.5 text-xs text-white/70">
+          <span aria-hidden>♪</span> {clip.sound}
+        </p>
+      </div>
+      <div className="absolute right-3 top-1/2 flex -translate-y-1/2 flex-col gap-4 text-white/85" aria-hidden>
+        {[<PixelHeart key="h" size={18} color="#fff" />, "💬", "↗"].map((g, k) => (
+          <span key={k} className="grid h-8 w-8 place-items-center rounded-full bg-white/15 text-sm backdrop-blur">
+            {g}
+          </span>
+        ))}
+      </div>
+      {/* Playback progress, like the thin bar at the bottom of a Reel. */}
+      <div className="absolute inset-x-0 bottom-0 h-0.5 bg-white/20" aria-hidden>
+        <div
+          className="h-full bg-white/80"
+          style={{
+            width: playing ? "100%" : "0%",
+            transition: playing ? "width 6s linear" : "none",
+          }}
+        />
+      </div>
+    </Footage>
   );
 }
 

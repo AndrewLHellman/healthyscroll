@@ -3,6 +3,9 @@ import type {
   VisionDescribeRequest,
   VisionDescribeResponse,
   VisionMediaResponse,
+  VisionTranscribeRequest,
+  VisionTranscribeResponse,
+  VisionTranscriptResponse,
 } from "@healthyscroll/shared";
 import { VISION_BASE_URL } from "../lib/config";
 import { authedFetch } from "./auth";
@@ -88,4 +91,57 @@ export async function* describeStream(
       return;
     }
   }
+}
+
+/**
+ * The last-resort audio pass: what's said in the Reel (ElevenLabs, server-side).
+ * Only for a Reel on screen that text + description left Jev unsure about.
+ * Resolves to the transcript, or null when there's nothing usable (no speech,
+ * no audio track, budget used up, service not configured, timeout) — never throws.
+ */
+export async function transcribeAndWait(
+  req: VisionTranscribeRequest,
+  { timeoutMs = 15_000, intervalMs = 1000 } = {},
+): Promise<string | null> {
+  const started = performance.now();
+  const took = () => `${Math.round(performance.now() - started)}ms`;
+  let first: VisionTranscribeResponse;
+  try {
+    const res = await authedFetch(`${VISION_BASE_URL}/transcribe`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(req),
+    });
+    if (!res.ok) {
+      // 429 = daily budget used up, 503 = no ElevenLabs key on the server.
+      console.warn(`[vision] ${req.videoId} /transcribe ${res.status}: ${await res.text()}`);
+      return null;
+    }
+    first = (await res.json()) as VisionTranscribeResponse;
+  } catch (err) {
+    console.warn(`[vision] ${req.videoId} /transcribe failed`, err);
+    return null;
+  }
+  console.log(
+    `[vision] ${req.videoId} /transcribe ${first.transcriptStatus} cached=${first.cached} ` +
+      `audio=${first.audioSeconds ?? "?"}s server totalMs=${first.totalMs} (${first.model}) round trip ${took()}`,
+  );
+  if (first.transcriptStatus === "ready") return first.transcript?.trim() || null;
+  if (first.transcriptStatus !== "pending") return null;
+
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, intervalMs));
+    try {
+      const res = await authedFetch(`${VISION_BASE_URL}/transcript/${req.platform}/${encodeURIComponent(req.videoId)}`);
+      if (!res.ok) return null;
+      const t = (await res.json()) as VisionTranscriptResponse;
+      if (t.transcriptStatus === "ready") return t.transcript?.trim() || null;
+      if (t.transcriptStatus !== "pending") return null;
+    } catch {
+      return null;
+    }
+  }
+  console.warn(`[vision] ${req.videoId} transcript still pending; giving up at ${took()}`);
+  return null;
 }
