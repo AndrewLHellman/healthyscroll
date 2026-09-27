@@ -9,7 +9,11 @@ import { PixelHeart } from "./Mark";
  * that actually swipes, the decision log on the right. Probabilities are shown
  * on a meter with the two thresholds (0.2 / 0.8) so the mechanism is visible
  * without explanation. Covers are real Reels from public/playground/ (same as
- * the prompt playground); handles and captions are illustrative.
+ * the prompt playground); handles, captions and transcripts are illustrative.
+ *
+ * Three stages, like reels.ts: Jev on the text; Jev again once Gemini has
+ * described the images; and, only when that still lands in the middle band,
+ * ElevenLabs transcribes what's said and Jev decides with the transcript.
  *
  * Under prefers-reduced-motion it renders one fully-resolved frame, static.
  */
@@ -28,6 +32,8 @@ interface Clip {
   tone: [string, string];
   text: { p: number; ms: number };
   visual?: { caption: string; p: number; ms: number };
+  /** Last resort, only reached when `visual` is still "look closer". */
+  audio?: { transcript: string; p: number; ms: number };
 }
 
 const CLIPS: Clip[] = [
@@ -58,6 +64,21 @@ const CLIPS: Clip[] = [
     visual: { caption: "a man in a busy bar; on-screen text: ‘Also me after 3 margaritas’", p: 0.92, ms: 1310 },
   },
   {
+    // Is a crypto Reel "gambling"? Text and images can't settle it; what he says can.
+    author: "0xalpha",
+    desc: "this coin does 40x by friday",
+    sound: "original sound",
+    image: "/playground/crypto.jpg",
+    tone: ["#0e3b2e", "#03110c"],
+    text: { p: 0.46, ms: 192 },
+    visual: { caption: "a trading chart on a monitor; on-screen text: ‘CRYPTO IS ABOUT TO EXPLODE!’", p: 0.57, ms: 1280 },
+    audio: {
+      transcript: "…I put my whole paycheck on this one. Is it a coin flip? Sure. But if it hits, I never work again…",
+      p: 0.91,
+      ms: 2860,
+    },
+  },
+  {
     author: "ana.bakes",
     desc: "flatbread + butter chicken, weeknight edition",
     sound: "Kitchen sounds",
@@ -69,8 +90,8 @@ const CLIPS: Clip[] = [
 ];
 
 interface Line {
-  stage: "text" | "visual";
-  model: "jev" | "gemini";
+  stage: "text" | "visual" | "audio";
+  model: "jev" | "gemini" | "elevenlabs";
   body: string;
   p?: number;
   ms?: number;
@@ -136,6 +157,25 @@ function buildFrames(): Frame[] {
         push([textDone, mdDone, jevDone], 560, "out", true);
         return;
       }
+      if (jevDone.verdict === "look" && c.audio) {
+        // Still in the middle band with the Reel on screen: hear it out.
+        const elPending: Line = { stage: "audio", model: "elevenlabs", body: "transcribing what’s said…", pending: true };
+        const elDone: Line = { stage: "audio", model: "elevenlabs", body: `“${c.audio.transcript}”` };
+        const jevAudio: Line = {
+          stage: "audio",
+          model: "jev",
+          body: "with the transcript too, does it match?",
+          p: c.audio.p,
+          ms: c.audio.ms,
+          verdict: verdictOf(c.audio.p),
+        };
+        const seen = [textDone, mdDone, jevDone];
+        push([...seen, elPending], 1400);
+        push([...seen, elDone], 700);
+        push([...seen, elDone, jevAudio], jevAudio.verdict === "skip" ? 1100 : 1500);
+        push([...seen, elDone, jevAudio], 560, "out", jevAudio.verdict === "skip");
+        return;
+      }
       // Kept: the user watches, then scrolls on themselves.
       push([textDone, mdDone, jevDone], 700, "out", false);
       return;
@@ -147,8 +187,8 @@ function buildFrames(): Frame[] {
 }
 
 const FRAMES = buildFrames();
-/** The most legible single frame for the static (reduced-motion / SSR-first) render. */
-const STATIC_FRAME = FRAMES.findLast((f) => f.clip === 2 && f.lines.length === 3 && f.card === "in")!;
+/** The static (reduced-motion / SSR-first) render: the one clip that goes through all three stages. */
+const STATIC_FRAME = FRAMES.findLast((f) => f.clip === 3 && f.lines.length === 5 && f.card === "in")!;
 
 export function PipelineDemo() {
   const [i, setI] = useState<number | null>(null);
@@ -175,7 +215,7 @@ export function PipelineDemo() {
     <div
       className="rounded-2xl border border-line bg-mist p-3 sm:p-4"
       role="img"
-      aria-label="Illustrative demo: Healthy Scroll checks upcoming Reels with Jev while Gemini describes their images. Jev uses the text and descriptions to decide what matches your prompt."
+      aria-label="Illustrative demo: Healthy Scroll checks upcoming Reels with Jev while Gemini describes their images. Jev uses the text and descriptions to decide what matches your prompt; if it is still unsure, ElevenLabs transcribes what is said in the Reel and Jev decides with the transcript."
     >
       <div className="grid gap-3 sm:gap-4 lg:grid-cols-[minmax(0,260px)_1fr]">
         <Feed frame={frame} still={i === null} />
@@ -312,7 +352,7 @@ function Trace({ lines, clip }: { lines: Line[]; clip: Clip }) {
       </ol>
 
       <div className="mt-auto flex items-center justify-between gap-3 border-t border-line pt-3 text-[11px] text-faint">
-        <span>Reel images analyzed on the server</span>
+        <span>Reel images and audio analyzed on the server</span>
         <span className="flex items-center gap-3">
           <Key color="bg-keep" label="keep" />
           <Key color="bg-faint" label="look closer" />
