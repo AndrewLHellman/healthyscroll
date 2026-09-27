@@ -1,5 +1,7 @@
 # Healthy Scroll
 
+![Healthy Scroll demo](asset.gif)
+
 **Your prompt, your feed.** Healthy Scroll skips short-form videos that conflict with a policy you write in plain English. The primary target is **Instagram Reels on instagram.com in Safari on iPhone**, with Instagram Reels in desktop Chrome as the secondary target. It does not work inside the Instagram app; YouTube Shorts support is planned.
 
 Jev makes the filtering decisions through the web API. For Instagram, a separate vision service describes the Reel's own public video and images; it never receives your policy or uploads your screen. An optional audio pass transcribes unclear Reels through ElevenLabs. Filtering requires Google sign-in. API failures leave the Reel alone.
