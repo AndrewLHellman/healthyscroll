@@ -128,11 +128,11 @@ const FAQ = [
   },
   {
     q: "What’s doing the deciding?",
-    a: "An AI model called Jev checks the caption and comments against your prompt. If it’s unsure, a second model, Moondream, describes a video frame so Jev can check again.",
+    a: "Two checks run side by side. An AI model called Jev reads the caption, hashtags, and sound against your prompt, while a vision model (SigLIP 2) checks a few frames of the video. If the frames are inconclusive, a second vision model (Qwen3-VL) takes a closer look. Whichever is confident first decides.",
   },
   {
     q: "Where does my data go?",
-    a: "Your prompt, captions, and comments are sent to our server for evaluation. Captions and comments aren’t stored. If a video frame is needed, the server describes it and discards the image. Signing in saves your prompt, a skip log, and daily totals per topic (how many Reels, how long) for your dashboard. Which Reels you watched never leaves your phone.",
+    a: "Your prompt, captions, and comments are sent to our server for evaluation. Captions and comments aren’t stored. To check the video, our server fetches a few frames of the Reel itself; they’re held in memory briefly and never saved. Signing in saves your prompt, a skip log, and daily totals per topic (how many Reels, how long) for your dashboard. Which Reels you watched never leaves your phone.",
   },
   {
     q: "What does the weekly summary track?",

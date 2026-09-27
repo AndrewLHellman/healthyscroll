@@ -12,8 +12,10 @@ export interface PlaygroundClip {
   context: VideoContext;
   /** What Moondream would say about the first frame. Sent to Jev as a frame caption. */
   frameCaption: string;
-  /** Two-stop gradient standing in for the video. */
+  /** Two-stop gradient standing in for the video (and the fallback under `poster`). */
   tone: [string, string];
+  /** A real Reel for this category: its cover (in public/playground/) and link. */
+  reel?: { href: string; poster: string };
   mock: {
     /** What this clip is "about"; matched against words in the prompt. */
     tags: string[];
@@ -32,6 +34,7 @@ const clip = (
   frameCaption: string,
   tone: [string, string],
   mock: PlaygroundClip["mock"],
+  reel?: PlaygroundClip["reel"],
 ): PlaygroundClip => ({
   context: {
     videoId: `playground-${author}`,
@@ -45,6 +48,13 @@ const clip = (
   frameCaption,
   tone,
   mock,
+  reel,
+});
+
+/** Example Reels per category, picked by the team. Covers live in public/playground/. */
+const reel = (code: string, name: string): PlaygroundClip["reel"] => ({
+  href: `https://www.instagram.com/p/${code}/`,
+  poster: `/playground/${name}.jpg`,
 });
 
 export const CLIPS: PlaygroundClip[] = [
@@ -56,6 +66,7 @@ export const CLIPS: PlaygroundClip[] = [
     "a slot machine screen with spinning reels and flashing lights",
     ["#3b1d5a", "#0f0c1a"],
     { tags: ["gambling"], hit: 0.96, miss: 0.02 },
+    reel("DYH_SnMRkZw", "gambling"),
   ),
   clip(
     "ana.bakes",
@@ -65,6 +76,7 @@ export const CLIPS: PlaygroundClip[] = [
     "hands pressing dimples into bread dough on a wooden counter",
     ["#e8b27a", "#7a4a22"],
     { tags: ["food"], hit: 0.88, miss: 0.01 },
+    reel("DTxgqPPgdsr", "food"),
   ),
   clip(
     "saturday.recap",
@@ -74,6 +86,7 @@ export const CLIPS: PlaygroundClip[] = [
     "a crowded bar, several people holding drinks and shot glasses",
     ["#1b2a44", "#0a0e17"],
     { tags: ["drinking"], hit: 0.91, miss: 0.04 },
+    reel("CtrGRgVA3_V", "drinking"),
   ),
   clip(
     "trail.mornings",
@@ -83,6 +96,7 @@ export const CLIPS: PlaygroundClip[] = [
     "a person running on a dirt trail at sunrise, trees on both sides",
     ["#d9c7a3", "#5e6a4e"],
     { tags: [], hit: 0.5, miss: 0.03 },
+    reel("DTaa_I7jJAC", "run"),
   ),
   clip(
     "shredszn",
@@ -92,6 +106,7 @@ export const CLIPS: PlaygroundClip[] = [
     "a shirtless man flexing in a gym mirror, side-by-side before and after",
     ["#2b2b2b", "#0d0d0d"],
     { tags: ["body"], hit: 0.84, miss: 0.06 },
+    reel("CzraHyGJsJ_", "thirst-trap"),
   ),
   clip(
     "ratio.king",
@@ -101,6 +116,7 @@ export const CLIPS: PlaygroundClip[] = [
     "a split-screen reaction video with large red caption text",
     ["#7a1f1f", "#1a0707"],
     { tags: ["rage"], hit: 0.89, miss: 0.02 },
+    reel("DXd8jAyjhuM", "rage-bait"),
   ),
   clip(
     "0xalpha",
@@ -110,6 +126,7 @@ export const CLIPS: PlaygroundClip[] = [
     "a man talking to camera in front of a green candlestick chart",
     ["#0e3b2e", "#03110c"],
     { tags: ["crypto"], hit: 0.93, miss: 0.01 },
+    reel("DaqfH-3vCx6", "crypto"),
   ),
   clip(
     "pottery.hour",
@@ -119,5 +136,6 @@ export const CLIPS: PlaygroundClip[] = [
     "hands shaping wet clay on a spinning pottery wheel",
     ["#b8a08a", "#4a3b30"],
     { tags: [], hit: 0.5, miss: 0.02 },
+    reel("DWAs_s3jPFw", "pottery"),
   ),
 ];
