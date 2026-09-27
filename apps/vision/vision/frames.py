@@ -7,7 +7,7 @@ representation and hand its URL to ffmpeg with `-ss` *before* `-i`, so ffmpeg
 reads the index and fetches only the bytes around each timestamp (HTTP range
 requests). The same path works for a plain progressive MP4 URL or a local file.
 
-Frames: one every VISION_FRAME_EVERY_S (default 3 s), at most VISION_MAX_FRAMES (4),
+Frames: one every VISION_FRAME_EVERY_S (default 3 s), at most VISION_MAX_FRAMES (3),
 plus the poster image as frame 0 when given. One ffmpeg process per Reel reads
 the video from the first timestamp to the last in a single connection and emits
 every Nth second as a JPEG. (One process per timestamp, each with its own TLS
@@ -71,8 +71,8 @@ class Frames:
 def sample_timestamps(duration: float | None) -> list[float]:
     """0.5 s, then every VISION_FRAME_EVERY_S, capped at VISION_MAX_FRAMES and the video's length.
 
-    With no known duration we ask for the full set; ffmpeg returns nothing past
-    the end and those frames are dropped (requests run in parallel, so it's free).
+    With no known duration we ask for the full set; ffmpeg stops at the end of a
+    shorter video and we keep the frames it did produce.
     """
     step, cap = settings.frame_every_s, settings.max_frames
     ts = [0.5 + i * step for i in range(cap)]

@@ -9,7 +9,7 @@ Reel's own text, and Jev decides.
 
 ```
                                           ┌── once per Reel, shared by ALL users (cached) ──┐
-extension ─POST /describe─▶ vision ──────▶│ ffmpeg: 1 frame / 3 s (max 4) + poster, 448 px  │ ~0.5-1.5 s
+extension ─POST /describe─▶ vision ──────▶│ ffmpeg: 1 frame / 3 s (max 3) + poster, 448 px  │ ~0.5-1.5 s
  (for upcoming Reels,                     │ VLM: <= 40 words — people, activities, objects, │ ~1-2 s gateway
   in parallel with Jev text)              │      setting, quoted on-screen text              │ ~4 s laptop GPU
                                           └──────────────────────────────────────────────────┘

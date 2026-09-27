@@ -45,7 +45,8 @@ const skipped = new Set<string>(); // `${tabId}:${code}`
 const MAX_REELS = 500;
 
 // Prefetch sends every Reel in a feed page at once; don't flood the servers.
-const MAX_CONCURRENT = 3;
+// Each Reel holds a slot for ~4 s (vision is network-bound on the server, not CPU).
+const MAX_CONCURRENT = 5;
 let running = 0;
 const queue: (() => void)[] = [];
 async function limited<T>(fn: () => Promise<T>): Promise<T> {
