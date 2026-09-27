@@ -14,17 +14,17 @@ import { categoryColor, REST_COLOR } from "@/lib/categoryColors";
 
 /** Categories beyond the top N collapse into one grey band so the stack stays legible. */
 const TOP_N = 5;
-const WEEKDAY = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+const WEEKDAY = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 export function WeekMock() {
-  return <WeekView week={buildMockWeek()} note="from your phone" />;
+  return <WeekView week={buildMockWeek()} />;
 }
 
 /**
  * The "Your week" panel for any Summary: the landing page's mock, or the
  * dashboard's real week (summarizeDays over the synced daily totals).
  */
-export function WeekView({ week, note }: { week: Summary; note: string }) {
+export function WeekView({ week, note }: { week: Summary; note?: string }) {
   const first = week.days[0].date;
   const last = week.days[week.days.length - 1].date;
 
@@ -38,7 +38,8 @@ export function WeekView({ week, note }: { week: Summary; note: string }) {
           </span>
         </p>
         <p className="font-mono text-[11px] text-faint">
-          {dayLabel(first)} – {dayLabel(last)} · {note}
+          {rangeLabel(first, last)}
+          {note && ` · ${note}`}
         </p>
       </header>
 
@@ -96,7 +97,7 @@ function Days({ week }: { week: Summary }) {
                   <div key={cat} style={{ height: `${(ms / d.totalMs) * 100}%`, background: color(cat) }} />
                 ))}
               </div>
-              <p className="text-center font-mono text-[10px] text-faint">{WEEKDAY[weekday(d.date)]}</p>
+              <p className="truncate text-center font-mono text-[10px] text-faint">{WEEKDAY[weekday(d.date)]}</p>
             </div>
           );
         })}
@@ -206,9 +207,14 @@ function weekday(date: string): number {
   return new Date(`${date}T12:00:00`).getDay();
 }
 
-function dayLabel(date: string): string {
-  const d = new Date(`${date}T12:00:00`);
-  return `${WEEKDAY[d.getDay()]} ${d.getDate()}`;
+const MONTH = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+/** "September 21 – 27", or "September 28 – October 4" when the week crosses a month. */
+function rangeLabel(first: string, last: string): string {
+  const a = new Date(`${first}T12:00:00`);
+  const b = new Date(`${last}T12:00:00`);
+  const start = `${MONTH[a.getMonth()]} ${a.getDate()}`;
+  return a.getMonth() === b.getMonth() ? `${start} – ${b.getDate()}` : `${start} – ${MONTH[b.getMonth()]} ${b.getDate()}`;
 }
 
 function pct(x: number): string {

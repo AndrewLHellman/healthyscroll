@@ -40,10 +40,6 @@ export function PopupMock() {
           </span>
           <span aria-hidden>→</span>
         </p>
-
-        <p className="mt-3 text-[11px] leading-snug text-faint">
-          Your watch-time summary syncs as daily totals per topic.
-        </p>
       </div>
     </div>
   );

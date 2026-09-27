@@ -220,7 +220,7 @@ function ShareSkipped({ days }: { days: DayStat[] }) {
     >
       <div className="flex h-44 items-end gap-1.5 sm:gap-3" role="img" aria-label={shareLabel(days, seen, skipped)}>
         {days.map((d) => (
-          <div key={d.date} className="flex h-full flex-1 flex-col justify-end gap-1.5" title={shareTitle(d)}>
+          <div key={d.date} className="flex h-full min-w-0 flex-1 flex-col justify-end gap-1.5" title={shareTitle(d)}>
             <p className="text-center font-mono text-[10px] tabular-nums text-faint">{compactDuration(d.seconds)}</p>
             {/* The whole column is the day's scrolling; the filled part is what got skipped. */}
             <div className="relative flex flex-1 flex-col justify-end overflow-hidden rounded-sm bg-mist">
@@ -236,7 +236,7 @@ function ShareSkipped({ days }: { days: DayStat[] }) {
                 </>
               )}
             </div>
-            <p className="text-center font-mono text-[10px] text-faint">{weekday(d.ts).slice(0, 2)}</p>
+            <p className="truncate text-center font-mono text-[10px] text-faint">{weekday(d.ts)}</p>
           </div>
         ))}
       </div>

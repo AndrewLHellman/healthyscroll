@@ -84,7 +84,7 @@ export function Architecture() {
                         <div style={{ flex: d.gambling, background: categoryColor("gambling") }} />
                         <div style={{ flex: d.drinking, background: categoryColor("drinking_nightlife") }} />
                       </div>
-                      <p className="text-center font-mono text-[10px] text-faint">{WEEKDAY[(i + 1) % 7]}</p>
+                      <p className="truncate text-center font-mono text-[10px] text-faint">{WEEKDAY[(i + 1) % 7]}</p>
                     </div>
                   );
                 })}

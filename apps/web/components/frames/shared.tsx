@@ -120,4 +120,4 @@ export function Key({ color, label }: { color: string; label: string }) {
   );
 }
 
-export const WEEKDAY = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+export const WEEKDAY = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];

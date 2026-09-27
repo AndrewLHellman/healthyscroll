@@ -55,7 +55,7 @@ export function Week() {
                         <div key={cat} style={{ height: `${(ms / d.totalMs) * 100}%`, background: color(cat) }} />
                       ))}
                     </div>
-                    <p className="text-center font-mono text-[11px] text-faint">{WEEKDAY[weekday(d.date)]}</p>
+                    <p className="truncate text-center font-mono text-[11px] text-faint">{WEEKDAY[weekday(d.date)]}</p>
                   </div>
                 );
               })}

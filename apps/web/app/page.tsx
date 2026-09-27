@@ -38,9 +38,9 @@ function Hero() {
           Take back your feed.
         </h1>
         <p className="mt-6 max-w-2xl text-lg leading-relaxed text-muted">
-          Watching something doesn’t always mean you want more of it. Healthy Scroll lets you
-          set your own limits on what shows up in your feed, from rage bait to body comparison.
-          Tell it what you’d like to avoid, and it skips matching Reels in Safari on your iPhone.
+          You should have a say in what keeps showing up in your feed. Whether you’re cutting
+          back on drinking or tired of comparing yourself to strangers, Healthy Scroll lets you
+          decide what to avoid and automatically skips Reels that match.
         </p>
         <div className="mt-8 flex flex-wrap items-center gap-4">
           <a
@@ -94,7 +94,7 @@ function Week() {
         <SectionHeading
           eyebrow="Your week"
           title="Get to know your scrolling habits."
-          body="See which topics take up your time and which ones you tend to linger on. Your weekly summary can help you decide whether your feed is how you want to spend that time, and what you’d like to change. Only daily totals per topic leave your phone, and only if you sign in."
+          body="See which topics take up your time and which ones you tend to linger on. Your weekly summary can help you decide whether your feed is how you want to spend that time, and what you’d like to change."
         />
         <div className="mt-12">
           <WeekMock />
@@ -116,7 +116,7 @@ const FAQ = [
   },
   {
     q: "Do I need an account?",
-    a: "Yes. Sign in with Google in the extension to turn on filtering and sync your prompt and daily summaries with your dashboard.",
+    a: "Yes. Sign in with Google in the extension to turn on filtering. Your weekly summary also appears on your dashboard.",
   },
   {
     q: "Does it slow scrolling down?",
@@ -132,7 +132,7 @@ const FAQ = [
   },
   {
     q: "Where does my data go?",
-    a: "Your prompt and Reel text go to our server for evaluation. Visual checks use the Reel’s own images and video, without uploading your screen. Daily totals by topic sync to your dashboard.",
+    a: "Your prompt and Reel text go to our server for evaluation. Visual checks use the Reel’s own images and video, without uploading your screen. The weekly summary keeps only daily totals by topic.",
   },
   {
     q: "What does the weekly summary track?",
