@@ -30,13 +30,13 @@ export const metadata: Metadata = {
     url: "/",
     siteName: "Healthy Scroll",
     // Rendered from components/frames/Thumbnail.tsx by scripts/shoot-graphics.sh.
-    images: [{ url: "/graphics/thumbnail-devpost.png", width: 3000, height: 2000, alt: "Healthy Scroll: Take back your feed." }],
+    images: [{ url: "/graphics/thumbnail-og.png", width: 2400, height: 1260, alt: "Healthy Scroll: Take back your feed." }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Healthy Scroll",
     description: "Take back your feed.",
-    images: ["/graphics/thumbnail-devpost.png"],
+    images: ["/graphics/thumbnail-og.png"],
   },
 };
 

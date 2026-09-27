@@ -21,6 +21,8 @@ export const FRAMES: FrameDef[] = [
   { slug: "thumbnail-light", title: "Thumbnail (light)", note: "Brand card on paper.", size: OG, render: () => <Thumbnail /> },
   { slug: "thumbnail-dark", title: "Thumbnail (dark)", note: "Same card on ink, for dark surfaces.", size: OG, render: () => <Thumbnail dark /> },
   { slug: "thumbnail-devpost", title: "Thumbnail (Devpost)", note: "Light card at 3:2 for the Devpost gallery.", size: DEVPOST, render: () => <Thumbnail size={DEVPOST} cell={18} type={1.5} top={1.5} body={1.2} /> },
+  { slug: "thumbnail-og", title: "Thumbnail (OG)", note: "Light card at 1.91:1 with bigger type, for link previews.", size: OG, render: () => <Thumbnail cell={14} type={1.35} top={1.35} body={1.15} /> },
+  { slug: "thumbnail-16x9", title: "Thumbnail (16:9)", note: "Light card at 16:9 for video thumbnails.", size: VIDEO, render: () => <Thumbnail size={VIDEO} cell={22} type={1.3} top={1.3} body={1.1} /> },
   { slug: "mark-square", title: "Mark (square)", note: "Square brand tile for Devpost thumbnail.", size: SQUARE, render: () => <MarkSquare /> },
   { slug: "mark", title: "Mark", note: "Just the pixel mark on white. 30px per cell.", size: SQUARE, render: () => <MarkOnly /> },
   // Demo video backgrounds (scripts/demo-video.sh); the bottom band is left for the cameras.
