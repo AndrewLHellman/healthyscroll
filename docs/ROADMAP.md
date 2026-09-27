@@ -1,5 +1,15 @@
 # Roadmap / TODO
 
+## Current targets
+
+Instagram Reels on `instagram.com` in **Safari on iPhone** is the primary target; Instagram Reels in **desktop Chrome** is the secondary target. Both use `background/reels.ts` and the shared vision service. YouTube Shorts is planned. TikTok remains legacy code, not the secondary product target.
+
+The Safari simulator filtering and sign-in loop has been verified; the Instagram hook has also been verified in desktop Chrome. The web and vision services deploy through Docker/GitHub Actions. See the [README](../README.md) for current setup and [AGENTS.md](../AGENTS.md) for recorded verification details. Do not drive a browser or load the extension unless asked.
+
+## Archived TikTok prototype roadmap
+
+The checklist below records the earlier TikTok prototype and its historical status. Its unchecked tasks are not the current Instagram plan; Moondream setup and viewport capture do not apply to either Instagram target.
+
 Status as of 2026-09-26: **TikTok adapter verified on the live For You page** (scrape + skip). Backend (Jev) and Moondream not yet run. The content script observer is gated behind `VITE_HS_ENABLE_CONTENT=true`.
 
 ## Phase 1 — make the loop work end to end
@@ -32,7 +42,7 @@ Status as of 2026-09-26: **TikTok adapter verified on the live For You page** (s
 
 ## Later / maybe
 
-- Instagram Reels and YouTube Shorts adapters (same `VideoContext` shape, new `content/<platform>.ts`).
+- Historical proposal: Instagram Reels and YouTube Shorts adapters. Instagram is now implemented and is the current target on both browsers; YouTube Shorts remains planned.
 - Moondream Cloud fallback route (`/api/describe`) for users without Station — opt-in, since frames leave the device.
 - Use a Jev `choice` question to tag *which* part of the policy matched, for a "skipped because: gambling" tooltip.
 - Unit tests for `decide()` with `Experimental_EvaluationMockModelV4`.

@@ -112,7 +112,7 @@ function Week() {
 const FAQ = [
   {
     q: "Where does it work?",
-    a: "On instagram.com in Safari on iPhone, and on TikTok in Chrome. It doesn’t work inside the Instagram app. Support for YouTube Shorts is planned.",
+    a: "On instagram.com in Safari on iPhone, and in desktop Chrome. It doesn’t work inside the Instagram app. Support for YouTube Shorts is planned.",
   },
   {
     q: "Do I need an account?",

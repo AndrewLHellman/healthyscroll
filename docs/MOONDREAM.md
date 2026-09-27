@@ -1,4 +1,6 @@
-# Moondream (on-device vision)
+# Moondream (legacy TikTok on-device vision)
+
+This reference covers the legacy TikTok/Chrome implementation. The current targets are Instagram Reels in iPhone Safari (primary) and desktop Chrome (secondary); both use `apps/vision` to describe Reel media and do not require Moondream Station.
 
 Reference notes for the vision model. Verified 2026-09-25.
 
@@ -14,7 +16,7 @@ Moondream is a family of tiny vision-language models (0.5B, 2B, 3B params) built
 - Same REST shape as Moondream Cloud, so swapping the base URL is the only change for a cloud fallback.
 - Install: https://moondream.ai/station — docs: https://docs.moondream.ai/station/
 
-Users of Healthy Scroll need Station running for the visual stages. Without it, the extension degrades to text-only decisions.
+The legacy TikTok pipeline needs Station running for its visual stages. Without it, the extension degrades to text-only decisions.
 
 ## API surface we use
 

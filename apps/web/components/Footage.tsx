@@ -1,6 +1,9 @@
+import { ReelVideo } from "./ReelVideo";
+
 /**
  * A gradient + grain stand-in for a video frame. Shared by every mockup so
- * "footage" looks the same everywhere on the page.
+ * "footage" looks the same everywhere on the page. Given a real cover it shows
+ * that; given a clip too, the clip plays over the cover while `playing`.
  */
 
 export const GRAIN =
@@ -9,12 +12,20 @@ export const GRAIN =
 export function Footage({
   tone,
   image,
+  video,
+  playing = false,
+  preload,
   className = "",
   children,
 }: {
   tone: [string, string];
   /** Optional real frame. Layered over the gradient, so a missing file just shows the gradient. */
   image?: string;
+  /** Optional real clip (muted, looping), layered over the frame. */
+  video?: string;
+  /** Whether the clip is playing right now; it rewinds when it stops. */
+  playing?: boolean;
+  preload?: "none" | "metadata" | "auto";
   className?: string;
   children?: React.ReactNode;
 }) {
@@ -24,6 +35,7 @@ export function Footage({
       className={`relative overflow-hidden ${className}`}
       style={{ background: image ? `center / cover no-repeat url("${image}"), ${gradient}` : gradient }}
     >
+      {video && <ReelVideo src={video} poster={image} playing={playing} preload={preload} />}
       <div className="absolute inset-0 opacity-[0.18] mix-blend-overlay" style={{ backgroundImage: GRAIN }} aria-hidden />
       {children}
     </div>

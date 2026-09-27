@@ -31,6 +31,8 @@ export function PromptPlayground() {
   const [prompt, setPrompt] = useState(PRESETS[0]);
   const [scores, setScores] = useState<Score[]>(() => CLIPS.map(() => null));
   const [pending, setPending] = useState(true);
+  // The tile under the pointer (or keyboard focus) plays its Reel; the rest show their cover.
+  const [hovered, setHovered] = useState<number | null>(null);
   const live = scorer.id === "jev";
   // Bumped per request so a slow response can't overwrite a newer one.
   const seq = useRef(0);
@@ -127,11 +129,20 @@ export function PromptPlayground() {
           const p = scores[i];
           const v = verdicts[i];
           return (
-            <li key={c.context.author} className={`w-[112px] shrink-0 transition-opacity sm:w-auto ${pending ? "opacity-70" : ""}`}>
+            <li
+              key={c.context.author}
+              className={`w-[112px] shrink-0 transition-opacity sm:w-auto ${pending ? "opacity-70" : ""}`}
+              onPointerEnter={() => setHovered(i)}
+              onPointerLeave={() => setHovered((h) => (h === i ? null : h))}
+              onFocus={() => setHovered(i)}
+              onBlur={() => setHovered((h) => (h === i ? null : h))}
+            >
               <Tile href={c.reel?.href}>
                 <Footage
                   tone={c.tone}
                   image={c.reel?.poster}
+                  video={c.reel?.video}
+                  playing={hovered === i}
                   className={`aspect-[9/16] rounded-lg transition-all duration-500 ${v === "skip" ? "opacity-30 grayscale" : "opacity-100"}`}
                 >
                   <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-2 pt-8 text-white">

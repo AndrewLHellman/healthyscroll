@@ -1,5 +1,7 @@
 # apps/vision — Reel description service
 
+Shared by Instagram Reels in Safari on iPhone (primary target) and desktop Chrome (secondary target). Neither Instagram target requires Moondream Station.
+
 FastAPI service that takes one Instagram Reel (its DASH manifest or a video URL,
 plus the poster), pulls frames with ffmpeg **without downloading the whole
 video**, and has a VLM write a short description of what's in them. It makes

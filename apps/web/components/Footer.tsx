@@ -24,7 +24,7 @@ const COLUMNS = [
     title: 'Runs on',
     links: [
       { label: 'Instagram Reels (Safari)', href: '/#faq' },
-      { label: 'TikTok (Chrome)', href: '/#faq' },
+      { label: 'Instagram (Chrome)', href: '/#faq' },
       { label: 'YouTube Shorts (soon)', href: '/#faq' },
     ],
   },

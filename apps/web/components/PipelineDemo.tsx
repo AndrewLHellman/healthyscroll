@@ -2,14 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { Footage } from "./Footage";
-import { PixelHeart } from "./Mark";
 
 /**
  * Looping, scripted trace of the real pipeline: a Reels-style feed on the left
  * that actually swipes, the decision log on the right. Probabilities are shown
  * on a meter with the two thresholds (0.2 / 0.8) so the mechanism is visible
- * without explanation. Covers are real Reels from public/playground/ (same as
- * the prompt playground); handles, captions and transcripts are illustrative.
+ * without explanation. The Reels are real, from public/playground/ (same as the
+ * prompt playground), muted and looping, with their real handles and captions;
+ * probabilities, timings, descriptions and the transcript are illustrative.
  *
  * Three stages, like reels.ts: Jev on the text; Jev again once Gemini has
  * described the images; and, only when that still lands in the middle band,
@@ -26,9 +26,9 @@ interface Clip {
   author: string;
   desc: string;
   sound: string;
-  /** Real Reel cover (public/playground/). */
-  image: string;
-  /** Fallback under the image while it loads. */
+  /** Real Reel, by file name in public/playground/ (`<reel>.jpg` cover, `<reel>.mp4` clip). */
+  reel: string;
+  /** Fallback under the cover while it loads. */
   tone: [string, string];
   text: { p: number; ms: number };
   visual?: { caption: string; p: number; ms: number };
@@ -38,37 +38,37 @@ interface Clip {
 
 const CLIPS: Clip[] = [
   {
-    author: "spinsdaily",
-    desc: "late night spins hit different 🎰 #slots #bigwin",
+    author: "missluckycharm77",
+    desc: "Slot wins! #slots #casino #gambling",
     sound: "original sound",
-    image: "/playground/gambling.jpg",
+    reel: "gambling",
     tone: ["#3b1d5a", "#0f0c1a"],
     text: { p: 0.96, ms: 184 },
   },
   {
-    author: "trail.mornings",
-    desc: "6am run before work. always worth it",
+    author: "akak_akram",
+    desc: "Same direction. Same pace. Same mission. #running #motivation",
     sound: "Avril 14th · Aphex Twin",
-    image: "/playground/run.jpg",
+    reel: "run",
     tone: ["#d9c7a3", "#5e6a4e"],
     text: { p: 0.03, ms: 171 },
-    visual: { caption: "two people running along a seaside path under a cloudy sky", p: 0.02, ms: 1240 },
+    visual: { caption: "two men running along a seaside promenade; on-screen text: ‘What people see:’", p: 0.02, ms: 1240 },
   },
   {
-    author: "saturday.recap",
-    desc: "and that was the night 🍾",
+    author: "daveyboyyyyyy",
+    desc: "Spicy margs> #reels #drinks #memes",
     sound: "trending audio",
-    image: "/playground/drinking.jpg",
+    reel: "drinking",
     tone: ["#1b2a44", "#0a0e17"],
     text: { p: 0.54, ms: 203 },
     visual: { caption: "a man in a busy bar; on-screen text: ‘Also me after 3 margaritas’", p: 0.92, ms: 1310 },
   },
   {
     // Is a crypto Reel "gambling"? Text and images can't settle it; what he says can.
-    author: "0xalpha",
-    desc: "this coin does 40x by friday",
+    author: "overkilltrading",
+    desc: "CRYPTO BULL RUN LOADING 📈 JULY 11",
     sound: "original sound",
-    image: "/playground/crypto.jpg",
+    reel: "crypto",
     tone: ["#0e3b2e", "#03110c"],
     text: { p: 0.46, ms: 192 },
     visual: { caption: "a trading chart on a monitor; on-screen text: ‘CRYPTO IS ABOUT TO EXPLODE!’", p: 0.57, ms: 1280 },
@@ -79,13 +79,13 @@ const CLIPS: Clip[] = [
     },
   },
   {
-    author: "ana.bakes",
-    desc: "flatbread + butter chicken, weeknight edition",
+    author: "kookmutsjes",
+    desc: "• FLATBREAD MET BUTTER CHICKEN • Maak thuis de lekkerste flatbread met butter chicken!",
     sound: "Kitchen sounds",
-    image: "/playground/food.jpg",
+    reel: "food",
     tone: ["#e8b27a", "#7a4a22"],
     text: { p: 0.02, ms: 158 },
-    visual: { caption: "a tray of stuffed flatbreads topped with herbs", p: 0.01, ms: 1190 },
+    visual: { caption: "stuffed flatbreads on a board, one torn open to show melted cheese and chicken", p: 0.01, ms: 1190 },
   },
 ];
 
@@ -243,6 +243,8 @@ function Feed({ frame, still }: { frame: Frame; still: boolean }) {
         const y = offset === 0 ? (out ? "-100%" : "0%") : offset === 1 ? (out ? "0%" : "100%") : "100%";
         const moving = offset <= 1;
         const current = offset === 0;
+        // The Reel on screen plays, including through the swipe; the one sliding in starts as it appears.
+        const playing = !still && (current || (offset === 1 && out));
         return (
           <div
             key={clip.author}
@@ -256,7 +258,13 @@ function Feed({ frame, still }: { frame: Frame; still: boolean }) {
             }}
             aria-hidden={!current}
           >
-            <Card clip={clip} playing={current && !out && !still} dimmed={current && skipped && (out || still)} />
+            <Card
+              clip={clip}
+              playing={playing}
+              // Buffer the Reel on screen and the next one; the rest can wait their turn.
+              preload={moving ? "auto" : "metadata"}
+              dimmed={current && skipped && (out || still)}
+            />
           </div>
         );
       })}
@@ -280,11 +288,24 @@ function Feed({ frame, still }: { frame: Frame; still: boolean }) {
   );
 }
 
-function Card({ clip, playing, dimmed }: { clip: Clip; playing: boolean; dimmed: boolean }) {
+function Card({
+  clip,
+  playing,
+  preload,
+  dimmed,
+}: {
+  clip: Clip;
+  playing: boolean;
+  preload: "auto" | "metadata";
+  dimmed: boolean;
+}) {
   return (
     <Footage
       tone={clip.tone}
-      image={clip.image}
+      image={`/playground/${clip.reel}.jpg`}
+      video={`/playground/${clip.reel}.mp4`}
+      playing={playing}
+      preload={preload}
       className={`h-full w-full transition-[filter] duration-300 ${dimmed ? "brightness-75 grayscale" : ""}`}
     >
       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent p-4 pt-16 text-white">
@@ -293,13 +314,6 @@ function Card({ clip, playing, dimmed }: { clip: Clip; playing: boolean; dimmed:
         <p className="mt-2 flex items-center gap-1.5 text-xs text-white/70">
           <span aria-hidden>♪</span> {clip.sound}
         </p>
-      </div>
-      <div className="absolute right-3 top-1/2 flex -translate-y-1/2 flex-col gap-4 text-white/85" aria-hidden>
-        {[<PixelHeart key="h" size={18} color="#fff" />, "💬", "↗"].map((g, k) => (
-          <span key={k} className="grid h-8 w-8 place-items-center rounded-full bg-white/15 text-sm backdrop-blur">
-            {g}
-          </span>
-        ))}
       </div>
       {/* Playback progress, like the thin bar at the bottom of a Reel. */}
       <div className="absolute inset-x-0 bottom-0 h-0.5 bg-white/20" aria-hidden>

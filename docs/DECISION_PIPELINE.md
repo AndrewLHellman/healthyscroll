@@ -1,82 +1,45 @@
 # Decision pipeline
 
-Where the product actually lives. Implemented in `apps/extension/src/background/orchestrator.ts`; constants in `packages/shared/src/thresholds.ts`.
+The current pipeline is implemented in `apps/extension/src/background/reels.ts` and shared by **Instagram Reels in Safari on iPhone (primary)** and **Instagram Reels in desktop Chrome (secondary)**. Jev makes every filtering decision; the vision service only describes media.
 
-## Inputs
+## Inputs and output
 
-- `UserPolicy.prompt` — the user's free text. Treated as the *definition* of "violates".
-- `VideoContext` — text scraped from the page: author, description, hashtags, sound title, top comments, any DOM captions.
-- `FrameDescription[]` — Moondream's output for frames captured so far (visual stages only).
+- The user’s plain-English policy defines unwanted content.
+- Reel context includes available caption, hashtags, author, and audio metadata.
+- Visual descriptions and, when needed, an audio transcript add evidence.
+- Jev returns a probability and a verdict through `/api/evaluate`. Shared questions and thresholds live in `packages/shared/src/questions.ts` and `thresholds.ts`.
 
-## Output
+The skip threshold is 0.80; probabilities at or below 0.20 are allowed. The middle band calls for more evidence rather than a guessed skip.
 
-`Decision { verdict: "skip" | "allow" | "uncertain", violatesProbability, stage, latencyMs }`
+## Text and vision in parallel
 
-## The single Jev question
+As Instagram discovers upcoming Reels, the extension begins a text evaluation and a `/describe` request in parallel. A confident text-only match can skip immediately when the Reel is active; a slow visual response does not hold it up.
 
-We ask Jev one boolean:
+Vision fetches the Reel’s own public media, describes the poster first when available, and then describes sampled video frames. The background receives descriptions through `visionClient.ts` and asks Jev to evaluate the text plus each new description. A confident match ends further evaluation; otherwise the pipeline waits for the fuller description. Vision never receives the user’s policy and never returns a filtering verdict.
 
-> "The user wrote a policy describing content they do NOT want to see while scrolling. Does this video conflict with that policy?"
+## Last-resort audio
 
-with `true`/`false` criteria spelled out (see `jevQuestions` in `packages/shared/src/questions.ts`). Jev returns `probability ∈ [0,1]`. Jev's guidance: ~0.98 = strong yes, ~0.02 = strong no, ~0.5 = genuinely unsure — so the middle band is meaningful, not noise.
+Only when text plus description leaves Jev uncertain, and only when the Reel is on screen, the extension requests `/transcribe`. It does not transcribe every prefetched Reel. Reels identified as using licensed music are excluded from this pass.
 
-Thresholds (`THRESHOLDS`):
+The service extracts up to the configured audio duration (30 seconds by default), sends it to ElevenLabs, and caches the transcript per Reel. Jev evaluates text, description, and transcript with stage `audio`. Per-user and global daily limits cap new transcriptions. Missing credentials or any transcription failure preserve the earlier answer.
 
-```
-p >= 0.80  → skip
-p <= 0.20  → allow
-otherwise  → uncertain
-```
+## Acting on decisions
 
-These are the main tuning knob. Start here, adjust after watching real feeds.
+The content script reports discovery and activity through `REELS_DISCOVERED` and `REEL_ACTIVE`. The background sends `SKIP_REEL` only for a confident match to the active Reel, at most once per Reel per tab. The content adapter performs the feed advance; it makes no filtering decisions.
 
-## Stages
+An earlier allow verdict can be refined by later visual evidence. An error is never a reason to skip. If vision fails, available text evidence still applies; a failed API request itself produces no skip.
 
-### 1. Text pass (`stage: "text"`) — target: < 300 ms end to end
+## Failure handling
 
-- Trigger: `VIDEO_CHANGED`.
-- State sent to Jev: policy + VideoContext. No frames.
-- `skip` → send `SKIP_VIDEO`, session over.
-- `allow` → *don't* stop. Text can lie (innocuous caption, provocative video). Fall through to monitor with a normal delay.
-- `uncertain` → fall through to the visual pass with **no delay**.
+| Situation | Behavior |
+| --- | --- |
+| Jev/API request fails | Log the error; no skip based on the failure. |
+| Media or description unavailable | Retain available evidence; do not invent a visual verdict. |
+| Audio missing, unavailable, or rate limited | Keep the earlier answer. |
+| User scrolls before a result arrives | Check the active Reel before acting. |
+| Repeated matching results | Skip at most once per Reel per tab. |
+| Database sync fails | Filtering continues; sync must not trigger or block a skip. |
 
-If Moondream Station is not reachable, the text pass is all we have; we stop here and leave the video alone.
+## Legacy TikTok pipeline
 
-### 2. Visual pass (`stage: "visual"`) — target: < 1.5 s
-
-- Capture the viewport with `chrome.tabs.captureVisibleTab` (JPEG q60).
-- Run two Moondream calls in parallel on the same frame:
-  - `caption({ length: "short" })` — generic description. Gives Jev context.
-  - `query({ question })` — the question is built from the user's policy: *"A user does not want to see: "{policy}". Describe anything in this image related to that, or say "nothing relevant"."* Gives Jev a directly relevant signal.
-- Append the `FrameDescription`, re-run Jev with `frames` included.
-- `skip` → `SKIP_VIDEO`. Otherwise continue to monitor.
-
-### 3. Monitor (`stage: "monitor"`)
-
-- Every `MONITOR_INTERVAL_MS` (1500), repeat the visual pass, accumulating frames (Jev sees the whole history each time, so a trend across frames counts).
-- Stop after `MAX_FRAMES_PER_VIDEO` (8) frames — roughly the first 12 s of a video — to cap CPU and API cost. Most TikToks are shorter than that anyway.
-- Any `VIDEO_CHANGED` / `VIDEO_ENDED` / tab close cancels the session immediately. Every await in the loop checks `session.cancelled` before acting, so a late Jev response can't skip the *next* video.
-
-## Failure modes to design around
-
-| Situation | Behaviour |
-|---|---|
-| API unreachable / Jev error | Log, do nothing. Never skip on error. |
-| Moondream Station not running | Text pass only. Consider surfacing a hint in the popup. |
-| User scrolls before decision returns | `SKIP_VIDEO` carries `videoId`; content script ignores mismatches. |
-| Selectors rot (TikTok redesign) | Everything is in `tiktok.ts`; `VideoContext` fields are all optional so partial scrapes still work. |
-| captureVisibleTab includes UI chrome | Fine for captions. Crop to the `<video>` bounding rect later if accuracy suffers. |
-
-## Why Jev and not a chat LLM
-
-- It's an *evaluation* model: fixed-schema output (probability), no tokens generated, so it's fast and there's nothing to parse.
-- Cost is negligible ($0.042 / 1M input; output is free) — running it on every single video, multiple times, is fine.
-- Calibrated probabilities make the "uncertain → look closer" branch principled rather than a hack.
-- Zero data retention is a per-request flag (`providerOptions.gateway.zeroDataRetention`).
-
-## Why Moondream and not sending frames to a cloud VLM
-
-- Privacy: what someone watches is sensitive. Frames never leave the device.
-- Latency: local, no upload. Sub-second on a laptop.
-- Cost: free.
-- Trade-off: user has to install Moondream Station. Acceptable for a hackathon demo; a Cloud fallback via `MOONDREAM_API_KEY` on the server is the escape hatch (see ROADMAP).
+`background/orchestrator.ts` retains the older TikTok/Chrome implementation: text evaluation, local Moondream descriptions from viewport captures, and periodic monitoring. Its content observer is gated by `VITE_HS_ENABLE_CONTENT`. That pipeline is not used by either Instagram target. See [MOONDREAM.md](MOONDREAM.md) for the legacy local model reference and the [vision README](../apps/vision/README.md) for the current description service.
