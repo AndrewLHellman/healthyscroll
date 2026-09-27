@@ -132,7 +132,7 @@ const FAQ = [
   },
   {
     q: "Where does my data go?",
-    a: "Your prompt and Reel text go to our server for evaluation. Visual checks use the Reel’s own images and video, without uploading your screen. Daily totals by topic sync to your dashboard.",
+    a: "Your prompt and Reel text go to our server for evaluation. Visual checks use the Reel’s own images and video, without uploading your screen. For the occasional Reel that’s still unclear, ElevenLabs transcribes that Reel’s own audio. Daily totals by topic sync to your dashboard.",
   },
   {
     q: "What does the weekly summary track?",

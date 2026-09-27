@@ -6,7 +6,7 @@ import type {
 } from "../lib/messages";
 import { getPolicy } from "./policyStore";
 import { cancel, onVideoChanged } from "./orchestrator";
-import { forgetTab, onReelActive, onReelsDiscovered } from "./reels";
+import { forceAudio, forgetTab, onReelActive, onReelsDiscovered } from "./reels";
 import { adoptSession, getAuthState, signIn, signOut } from "./auth";
 import { maybePullPolicy, maybePushFeed, pullPolicy, startPolicySync } from "./sync";
 import { pruneTally, recordViews } from "./tally";
@@ -98,6 +98,10 @@ chrome.runtime.onMessage.addListener((msg: ContentToBackground | PopupToBackgrou
         await recordViews(msg.views);
         maybePushFeed(msg.final);
       });
+      break;
+    // Debug builds only (hs:audio in the page console): force the paid audio pass.
+    case "FORCE_AUDIO":
+      if (DEBUG) void forceAudio(tabId, msg.code);
       break;
   }
 });

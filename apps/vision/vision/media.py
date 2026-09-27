@@ -128,3 +128,43 @@ class MediaStore:
             raise
         finally:
             del self._building[key]
+
+
+TranscriptStatus = Literal["none", "pending", "ready", "failed"]
+
+
+@dataclass
+class Transcript:
+    """One Reel's transcript (the last-resort audio pass), shared by every user like Media."""
+
+    key: str
+    status: TranscriptStatus = "pending"
+    text: str | None = None
+    # Seconds of audio ElevenLabs billed.
+    seconds: float | None = None
+    # The one in-flight transcription for this Reel; /transcribe callers wait on it together.
+    task: asyncio.Task | None = None
+    created_at: float = field(default_factory=time.time)
+
+
+class TranscriptStore:
+    """LRU of Transcripts by media key. A failed one stays failed: this pass costs money, so no retry loops."""
+
+    def __init__(self, max_entries: int = 4096):
+        self._entries: OrderedDict[str, Transcript] = OrderedDict()
+        self._max = max_entries
+
+    def get(self, key: str) -> Transcript | None:
+        entry = self._entries.get(key)
+        if entry:
+            self._entries.move_to_end(key)
+        return entry
+
+    def add(self, entry: Transcript) -> Transcript:
+        self._entries[entry.key] = entry
+        if len(self._entries) > self._max:
+            self._entries.popitem(last=False)
+        return entry
+
+    def __len__(self) -> int:
+        return len(self._entries)

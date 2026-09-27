@@ -3,7 +3,7 @@ import { sendToTab, type ReelInfo } from "../lib/messages";
 import { evaluate } from "./jevClient";
 import { recordSkip } from "./sync";
 import { rememberCategory } from "./tally";
-import { describeStream } from "./visionClient";
+import { describeStream, transcribeAndWait } from "./visionClient";
 
 /**
  * Instagram Reels pipeline. Every Reel is judged as soon as the page loads it —
@@ -21,6 +21,10 @@ import { describeStream } from "./visionClient";
  *   better description. Jev is never told which stage a description came from.
  *   The last answer stands once the service has nothing more.
  *   no description (no media, or the service failed) -> Jev's text answer stands.
+ *   still unsure after all that (0.2 < p < 0.8) -> the last-resort audio pass, only
+ *   once the Reel is on screen: the vision service transcribes its first ~30 s
+ *   (ElevenLabs, costs money per call) and Jev decides on text + description +
+ *   transcript. Skipped for Reels using a licensed song (the transcript is lyrics).
  *   any error -> leave the Reel alone (never skip on error).
  *
  * The TikTok pipeline (orchestrator.ts) is separate and unchanged.
@@ -28,10 +32,14 @@ import { describeStream } from "./visionClient";
 
 export interface Judgement {
   verdict: "skip" | "allow";
-  /** What Jev saw when it decided: the Reel's text only, or text + what's on screen. */
-  stage: "text" | "visual" | "none";
+  /** What Jev saw when it decided: the Reel's text only, + what's on screen, + what's said. */
+  stage: "text" | "visual" | "audio" | "none";
   reason: string;
   decision?: Decision;
+  /** Jev was still unsure (0.2 < p < 0.8): an "allow" by default that the audio pass may overturn. */
+  unsure?: boolean;
+  /** The description Jev saw, reused by the audio pass. */
+  description?: string;
 }
 
 interface ReelRecord {
@@ -40,7 +48,12 @@ interface ReelRecord {
   policyPrompt: string;
   judgement: Promise<Judgement>;
   settled?: Judgement;
+  /** The audio pass, started at most once, when the Reel is on screen and still unsure. */
+  audio?: Promise<Judgement>;
 }
+
+/** Transcribe Reels whose audio is a licensed song? Mostly lyrics, so off by default. */
+const TRANSCRIBE_LICENSED_MUSIC = false;
 
 const reels = new Map<string /* code */, ReelRecord>();
 const activeByTab = new Map<number, string>();
@@ -89,20 +102,96 @@ export function onReelActive(tabId: number, code: string, policy: UserPolicy): v
     }`,
   );
   void current.judgement.then(async (j) => {
-    if (j.verdict !== "skip" || activeByTab.get(tabId) !== code) return;
-    // One skip per Reel per tab: a second message mid-scroll would skip two Reels.
-    const key = `${tabId}:${code}`;
-    if (skipped.has(key)) return;
-    skipped.add(key);
-    if (skipped.size > MAX_REELS) skipped.delete(skipped.values().next().value!);
-    console.log(`[reels] skip ${code} (${j.stage}): ${j.reason}`);
-    try {
-      await sendToTab(tabId, { type: "SKIP_REEL", code, reason: j.reason });
-      if (j.decision) void recordSkip(current.context, j.decision);
-    } catch (err) {
-      console.warn("[reels] skip message failed", err);
-    }
+    if (activeByTab.get(tabId) !== code) return;
+    if (j.verdict === "skip") return skipIfActive(tabId, code, current, j);
+    // Last resort: unsure after text + description, and now it's actually on screen.
+    if (!j.unsure || !audioEligible(current.info)) return;
+    current.audio ??= decideWithAudio(current, j);
+    const a = await current.audio;
+    if (a.verdict === "skip") await skipIfActive(tabId, code, current, a);
   });
+}
+
+/** Debug (hs:audio): run the audio pass on the Reel on screen whatever Jev said, and act on it. */
+export async function forceAudio(tabId: number, code: string): Promise<void> {
+  const record = reels.get(code);
+  if (!record) return console.warn(`[reels] hs:audio ${code}: not judged yet`);
+  const j = await record.judgement;
+  if (!record.info.manifest && !record.info.videoUrl) return console.warn(`[reels] hs:audio ${code}: no media`);
+  console.log(`[reels] hs:audio ${code}: forcing the audio pass (was ${j.verdict}${j.unsure ? " UNSURE" : ""})`);
+  record.audio ??= decideWithAudio(record, j);
+  const a = await record.audio;
+  if (a.verdict === "skip") await skipIfActive(tabId, code, record, a);
+}
+
+async function skipIfActive(tabId: number, code: string, record: ReelRecord, j: Judgement): Promise<void> {
+  if (activeByTab.get(tabId) !== code) return;
+  // One skip per Reel per tab: a second message mid-scroll would skip two Reels.
+  const key = `${tabId}:${code}`;
+  if (skipped.has(key)) return;
+  skipped.add(key);
+  if (skipped.size > MAX_REELS) skipped.delete(skipped.values().next().value!);
+  console.log(`[reels] skip ${code} (${j.stage}): ${j.reason}`);
+  try {
+    await sendToTab(tabId, { type: "SKIP_REEL", code, reason: j.reason });
+    if (j.decision) void recordSkip(record.context, j.decision);
+  } catch (err) {
+    console.warn("[reels] skip message failed", err);
+  }
+}
+
+function audioEligible(info: ReelInfo): boolean {
+  if (!info.manifest && !info.videoUrl) return false;
+  if (info.audioKind === "music" && !TRANSCRIBE_LICENSED_MUSIC) {
+    console.log(`[reels] ${info.code} unsure, but its audio is a licensed song ("${info.audioTitle ?? "?"}"): no audio pass`);
+    return false;
+  }
+  return true;
+}
+
+/**
+ * The last-resort audio pass: transcribe what's said in the Reel, then Jev on
+ * text + description + transcript. Its answer is final. Any failure, or a Reel
+ * with no speech, keeps the earlier (unsure -> allow) answer.
+ */
+async function decideWithAudio(record: ReelRecord, prior: Judgement): Promise<Judgement> {
+  const { info, context } = record;
+  const t0 = performance.now();
+  const ms = () => `${Math.round(performance.now() - t0)}ms`;
+  console.log(`[reels] ${info.code} unsure after ${prior.stage} (${prior.reason}); audio ->`);
+  const transcript = await transcribeAndWait({
+    videoId: info.id,
+    platform: "instagram",
+    ...(info.manifest ? { manifest: info.manifest } : { videoUrl: info.videoUrl }),
+  });
+  if (!transcript) {
+    console.log(`[reels] ${info.code} audio <- nothing usable in ${ms()}; keeping ${prior.verdict}`);
+    return prior;
+  }
+  console.log(`[reels] ${info.code} audio <- "${transcript.slice(0, 200)}" in ${ms()}`);
+  try {
+    const d = await evaluate({
+      policy: { prompt: record.policyPrompt },
+      context,
+      frames: prior.description ? [{ videoId: info.id, atMs: 0, caption: prior.description }] : undefined,
+      transcript,
+    });
+    // Same rule as the other passes: keep the most confident category.
+    if ((d.category?.probability ?? 0) > (prior.decision?.category?.probability ?? 0)) categoryNoter(info.code)(d);
+    const j: Judgement = {
+      verdict: d.verdict === "skip" ? "skip" : "allow",
+      stage: "audio",
+      reason: `text+frames+audio p=${d.violatesProbability.toFixed(2)}: "${transcript.slice(0, 80)}"`,
+      decision: { ...d, stage: "audio" },
+      description: prior.description,
+    };
+    console.log(`[reels] ${info.code} jev(text+description+transcript) <- ${d.verdict} p=${d.violatesProbability.toFixed(2)} in ${ms()}`);
+    record.settled = j;
+    return j;
+  } catch (err) {
+    console.warn(`[reels] ${info.code} audio pass: Jev failed after ${ms()}`, err);
+    return prior;
+  }
 }
 
 export function forgetTab(tabId: number): void {
@@ -125,7 +214,8 @@ function judge(info: ReelInfo, policy: UserPolicy, force = false): ReelRecord {
   };
   void record.judgement.then((j) => {
     record.settled = j;
-    console.log(`[reels] ${info.code} -> ${j.verdict} (${j.stage}) ${j.reason}`);
+    // "UNSURE" marks the Reels that would get the audio pass if they come on screen.
+    console.log(`[reels] ${info.code} -> ${j.verdict}${j.unsure ? " UNSURE" : ""} (${j.stage}) ${j.reason}`);
   });
   reels.set(info.code, record);
   if (reels.size > MAX_REELS) reels.delete(reels.keys().next().value!);
@@ -209,6 +299,9 @@ async function decide(info: ReelInfo, context: VideoContext, policy: UserPolicy)
             stage: "visual",
             reason: `text+${stage ?? "frames"} p=${d.violatesProbability.toFixed(2)}: ${text.slice(0, 80)}`,
             decision: { ...d, stage: "visual" },
+            // Still unsure on the last description -> the audio pass may run when it's on screen.
+            unsure: d.verdict === "uncertain",
+            description: text,
           };
           if (last.verdict === "skip") break; // decided; whatever else the service has is moot
         } catch (err) {
@@ -243,7 +336,12 @@ async function decide(info: ReelInfo, context: VideoContext, policy: UserPolicy)
     const [text, full] = await Promise.allSettled([textP, fullP]);
     if (full.status === "fulfilled" && full.value) return full.value;
     if (text.status === "fulfilled") {
-      return { verdict: "allow", stage: "text", reason: `text p=${text.value.violatesProbability.toFixed(2)}, no description` };
+      return {
+        verdict: "allow",
+        stage: "text",
+        reason: `text p=${text.value.violatesProbability.toFixed(2)}, no description`,
+        unsure: text.value.verdict === "uncertain",
+      };
     }
     return { verdict: "allow", stage: "none", reason: "Jev unavailable" };
   } finally {

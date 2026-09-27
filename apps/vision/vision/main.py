@@ -1,9 +1,11 @@
 """
 Healthy Scroll vision service.
 
-    POST /describe                   Reel media -> a short description of what's in it
-    GET  /media/{platform}/{videoId} the description so far; ?wait=s&seen=stage holds the
-                                     request until there's a newer one (long poll)
+    POST /describe                        Reel media -> a short description of what's in it
+    GET  /media/{platform}/{videoId}      the description so far; ?wait=s&seen=stage holds the
+                                          request until there's a newer one (long poll)
+    POST /transcribe                      last resort: the Reel's audio -> what's said (ElevenLabs)
+    GET  /transcript/{platform}/{videoId} poll for that transcript
     GET  /health
 
 The service makes no decisions. It turns a Reel's video into text, once, shared
@@ -44,15 +46,26 @@ from pydantic import BaseModel, Field, model_validator
 
 from .auth import verify_bearer
 from .config import settings
-from .frames import VideoSource, extract_frames, fetch_poster
-from .media import CaptionStage, CaptionStatus, Media, MediaStore, to_jpegs
+from .frames import VideoSource, extract_audio, extract_frames, fetch_poster
+from .media import (
+    CaptionStage,
+    CaptionStatus,
+    Media,
+    MediaStore,
+    Transcript,
+    TranscriptStatus,
+    TranscriptStore,
+    to_jpegs,
+)
 from .scorers import REGISTRY, build_scorer
+from .transcribe import TranscribeError, cost_usd, transcribe_pcm
 
 log = logging.getLogger("vision")
 logging.basicConfig(level=logging.INFO)
 
 state: dict = {}
 store = MediaStore()
+transcripts = TranscriptStore()
 
 # Generation cost grows with visual tokens; 4 spread-out frames tell the story.
 CAPTION_MAX_FRAMES = 4
@@ -61,6 +74,10 @@ CAPTION_MAX_FRAMES = 4
 CAPTION_WAIT_S = 8.0
 # Longest a GET /media/... may be held waiting for a better description (long poll).
 MEDIA_WAIT_MAX_S = 10.0
+# /transcribe holds the request this long (audio fetch + ElevenLabs, ~1-3 s for 30 s of audio).
+TRANSCRIBE_WAIT_S = 12.0
+# Longest transcript kept (Jev's limit is the same; see shared MAX_TRANSCRIPT_CHARS).
+MAX_TRANSCRIPT_CHARS = 4000
 
 
 @asynccontextmanager
@@ -127,6 +144,37 @@ class DescribeResponse(BaseModel):
     # Which stage wrote `caption`: the cover image alone, or poster + video frames.
     stage: CaptionStage | None = None
     model: str
+
+
+class TranscribeRequest(BaseModel):
+    videoId: str = Field(min_length=1, max_length=128)
+    platform: Literal["instagram", "tiktok"] = "instagram"
+    # Exactly one of these. With a manifest, only its audio track is fetched.
+    manifest: str | None = Field(default=None, max_length=500_000)
+    videoUrl: str | None = None
+
+    @model_validator(mode="after")
+    def one_source(self):
+        if bool(self.manifest) == bool(self.videoUrl):
+            raise ValueError("send exactly one of manifest or videoUrl")
+        return self
+
+
+class TranscribeResponse(BaseModel):
+    videoId: str
+    # "ready" -> `transcript` is set ("" if nothing is said). "pending" -> poll GET /transcript/... .
+    transcriptStatus: TranscriptStatus
+    transcript: str | None = None
+    audioSeconds: float | None = None
+    cached: bool
+    totalMs: float
+    model: str
+
+
+class TranscriptResponse(BaseModel):
+    videoId: str
+    transcriptStatus: TranscriptStatus
+    transcript: str | None = None
 
 
 class MediaResponse(BaseModel):
@@ -256,6 +304,77 @@ def _image_count(media: Media) -> int:
     return 1 if media.stage == "poster" else 0
 
 
+class DailyBudget:
+    """
+    Caps on *new* transcriptions (cache hits are free) per user and overall, per
+    UTC day. Taken when a transcription starts, given back if it fails before or
+    at ElevenLabs. In memory: a restart resets today's counts, which is fine
+    next to the per-key credit limit set in the ElevenLabs dashboard.
+    """
+
+    def __init__(self):
+        self.day = ""
+        self.total = 0
+        self.seconds = 0.0
+        self.per_user: dict[str, int] = defaultdict(int)
+
+    def _roll(self) -> None:
+        today = time.strftime("%Y-%m-%d", time.gmtime())
+        if today != self.day:
+            self.day, self.total, self.seconds = today, 0, 0.0
+            self.per_user.clear()
+
+    def take(self, who: str) -> str | None:
+        """None if allowed (and counted), else why not."""
+        self._roll()
+        if self.total >= settings.transcribe_daily_max:
+            return "daily transcription budget used up"
+        if self.per_user[who] >= settings.transcribe_per_user_day:
+            return "your daily transcription limit is used up"
+        self.total += 1
+        self.per_user[who] += 1
+        return None
+
+    def give_back(self, who: str) -> None:
+        self._roll()
+        self.total = max(0, self.total - 1)
+        self.per_user[who] = max(0, self.per_user[who] - 1)
+
+    def billed(self, seconds: float) -> None:
+        self._roll()
+        self.seconds += seconds
+
+
+budget = DailyBudget()
+
+
+async def _transcribe(entry: Transcript, source: VideoSource, who: str) -> None:
+    started = time.perf_counter()
+    try:
+        clip = await extract_audio(source, settings.transcribe_max_s)
+        if clip is None:
+            budget.give_back(who)
+            entry.status = "failed"
+            log.info("%s transcript: no audio track", entry.key)
+            return
+        text, seconds = await transcribe_pcm(clip.pcm)
+        budget.billed(seconds)
+        entry.text, entry.seconds, entry.status = text[:MAX_TRANSCRIPT_CHARS], seconds, "ready"
+        log.info(
+            "%s transcript: %.1fs audio (%s) ~$%.4f in %.0f ms: %s",
+            entry.key, seconds, clip.input_desc, cost_usd(seconds), (time.perf_counter() - started) * 1000,
+            text[:120] or "(no speech)",
+        )
+    except (TranscribeError, ValueError) as err:
+        budget.give_back(who)
+        entry.status = "failed"
+        log.warning("%s transcript failed: %s", entry.key, err)
+    except Exception:
+        budget.give_back(who)
+        entry.status = "failed"
+        log.exception("%s transcript failed", entry.key)
+
+
 # --- routes ------------------------------------------------------------------
 
 
@@ -265,6 +384,9 @@ def health():
         "ok": True,
         "captioner": settings.captioner,
         "cachedReels": len(store._entries),
+        "transcriber": settings.elevenlabs_model if settings.elevenlabs_api_key else None,
+        "cachedTranscripts": len(transcripts),
+        "transcriptsToday": {"new": budget.total, "audioSeconds": round(budget.seconds, 1), "usd": round(cost_usd(budget.seconds), 4)},
     }
 
 
@@ -326,3 +448,53 @@ async def media_status(
         caption=media.caption,
         stage=media.stage,
     )
+
+
+@app.post("/transcribe", response_model=TranscribeResponse)
+async def transcribe(req: TranscribeRequest, request: Request, authorization: str | None = Header(default=None)):
+    """
+    The last-resort audio pass. The extension calls this only for the Reel on
+    screen, and only when its text + description left Jev unsure. Cached per
+    Reel; a new transcription counts against the daily budget (429 when used up).
+    """
+    who = await _caller(request, authorization)
+    _rate_limit(who, bucket="transcribe", per_min=30)
+    if not settings.elevenlabs_api_key:
+        raise HTTPException(status_code=503, detail="transcription is not configured (ELEVENLABS_API_KEY)")
+    started = time.perf_counter()
+
+    key = _media_key(req.platform, req.videoId)
+    entry = transcripts.get(key)
+    cached = entry is not None
+    if entry is None:
+        refused = budget.take(who)
+        if refused:
+            raise HTTPException(status_code=429, detail=refused)
+        entry = transcripts.add(Transcript(key=key))
+        source = VideoSource(manifest=req.manifest, url=req.videoUrl)
+        entry.task = asyncio.create_task(_transcribe(entry, source, who))
+
+    if entry.status == "pending" and entry.task is not None:
+        remaining = TRANSCRIBE_WAIT_S - (time.perf_counter() - started)
+        if remaining > 0:
+            await asyncio.wait({entry.task}, timeout=remaining)
+
+    return TranscribeResponse(
+        videoId=req.videoId,
+        transcriptStatus=entry.status,
+        transcript=entry.text,
+        audioSeconds=entry.seconds,
+        cached=cached,
+        totalMs=round((time.perf_counter() - started) * 1000, 1),
+        model=settings.elevenlabs_model,
+    )
+
+
+@app.get("/transcript/{platform}/{video_id}", response_model=TranscriptResponse)
+async def transcript_status(platform: str, video_id: str, request: Request, authorization: str | None = Header(default=None)):
+    who = await _caller(request, authorization)
+    _rate_limit(who, bucket="poll", per_min=settings.rate_per_min * 5)
+    entry = transcripts.get(_media_key(platform, video_id))
+    if entry is None:
+        raise HTTPException(status_code=404, detail="unknown reel; POST /transcribe first")
+    return TranscriptResponse(videoId=video_id, transcriptStatus=entry.status, transcript=entry.text)

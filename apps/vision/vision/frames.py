@@ -331,3 +331,108 @@ async def extract_frames(
         elapsed_ms=(time.perf_counter() - started) * 1000,
         input_desc=desc,
     )
+
+
+# --- audio (POST /transcribe) -------------------------------------------------
+#
+# The last-resort pass: when a Reel's text + description leave Jev unsure, the
+# Reel's own audio is transcribed (ElevenLabs, see transcribe.py). Same idea as
+# the frames: Instagram's DASH manifest lists a separate audio track (AAC,
+# ~64-128 kbit/s), so one range request for its first ~30 s is a few hundred KB.
+# ffmpeg turns that into 16 kHz mono PCM, the format ElevenLabs takes fastest.
+
+PCM_BYTES_PER_S = 16_000 * 2  # 16 kHz, 16-bit, mono
+AUDIO_PREFIX_MIN = 120_000
+AUDIO_PREFIX_MAX = 1_500_000
+AUDIO_PREFIX_UNKNOWN = 700_000
+
+
+@dataclass
+class AudioClip:
+    pcm: bytes  # s16le, 16 kHz, mono
+    seconds: float
+    input_desc: str
+
+
+def pick_dash_audio_url(manifest: str) -> tuple[str | None, int | None]:
+    """Smallest audio representation's BaseURL and its bandwidth (bit/s), or (None, None) if there's no audio track."""
+    try:
+        root = ET.fromstring(manifest)
+    except ET.ParseError as err:
+        raise ValueError(f"manifest is not valid XML: {err}") from err
+    candidates: list[tuple[int, str]] = []  # (bandwidth, url)
+    for aset in root.iterfind(".//mpd:AdaptationSet", _DASH_NS):
+        for rep in aset.iterfind("mpd:Representation", _DASH_NS):
+            mime = rep.get("mimeType") or aset.get("mimeType") or ""
+            ctype = aset.get("contentType") or ""
+            if "audio" not in mime and ctype != "audio":
+                continue
+            base = rep.find("mpd:BaseURL", _DASH_NS)
+            if base is None or not (base.text or "").strip():
+                continue
+            candidates.append((int(rep.get("bandwidth") or 0), base.text.strip()))
+    if not candidates:
+        return None, None
+    candidates.sort()
+    return candidates[0][1], candidates[0][0] or None
+
+
+def audio_prefix_budget(bandwidth: int | None, max_s: float) -> int:
+    if not bandwidth:
+        return AUDIO_PREFIX_UNKNOWN
+    return int(min(AUDIO_PREFIX_MAX, max(AUDIO_PREFIX_MIN, bandwidth / 8 * max_s * 1.1 + 64_000)))
+
+
+_PCM_OUT = ["-vn", "-ac", "1", "-ar", "16000", "-acodec", "pcm_s16le", "-f", "s16le", "pipe:1"]
+
+
+def _pcm_from_bytes(data: bytes, max_s: float) -> bytes:
+    """Decode up to max_s of audio from a (possibly truncated) MP4/fMP4 in memory."""
+    cmd = [settings.ffmpeg, "-hide_banner", "-loglevel", "error", "-nostdin", "-i", "pipe:0", "-t", f"{max_s:.1f}"]
+    try:
+        proc = subprocess.run(cmd + _PCM_OUT, input=data, capture_output=True, timeout=FFMPEG_TIMEOUT_S)
+    except subprocess.TimeoutExpired:
+        return b""
+    # A truncated file errors at the cut; what was decoded before it is still on stdout.
+    return proc.stdout
+
+
+def _pcm_from_url(url: str, max_s: float) -> bytes:
+    """ffmpeg reads the URL itself (range requests); used when the prefix didn't decode."""
+    cmd = _ffmpeg_cmd(url, 0.0, is_remote=True) + ["-t", f"{max_s:.1f}"]
+    try:
+        proc = subprocess.run(cmd + _PCM_OUT, capture_output=True, timeout=FFMPEG_TIMEOUT_S)
+    except subprocess.TimeoutExpired:
+        return b""
+    return proc.stdout
+
+
+async def extract_audio(source: VideoSource, max_s: float) -> AudioClip | None:
+    """The first max_s seconds of the Reel's audio as PCM, or None if it has none we can read."""
+    if source.manifest:
+        url, bandwidth = pick_dash_audio_url(source.manifest)
+        if not url:
+            return None  # a silent Reel, or audio muxed into the video track (not seen on Instagram)
+        desc = "dash-audio"
+        data = await asyncio.to_thread(_fetch_prefix, url, audio_prefix_budget(bandwidth, max_s))
+        pcm = await asyncio.to_thread(_pcm_from_bytes, data, max_s) if data else b""
+        if pcm:
+            desc += "+prefix"
+        else:
+            pcm = await asyncio.to_thread(_pcm_from_url, url, max_s)
+    elif source.url:
+        # A progressive MP4 interleaves video and audio, so this reads the video
+        # bytes too; ffmpeg over HTTP stops after max_s.
+        desc = "url"
+        pcm = await asyncio.to_thread(_pcm_from_url, source.url, max_s)
+    elif source.path:
+        desc = "file"
+        pcm = await asyncio.to_thread(_pcm_from_bytes, Path(source.path).read_bytes(), max_s)
+    else:
+        raise ValueError("VideoSource needs manifest, url or path")
+
+    pcm = pcm[: len(pcm) - len(pcm) % 2]  # whole samples only
+    seconds = len(pcm) / PCM_BYTES_PER_S
+    if seconds < 0.5:
+        return None
+    return AudioClip(pcm=pcm, seconds=seconds, input_desc=desc)
