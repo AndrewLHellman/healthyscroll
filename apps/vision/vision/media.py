@@ -4,7 +4,14 @@ Global media cache: one entry per Reel, shared by every user.
 Fetching frames and describing them doesn't depend on who is watching, so a
 popular Reel is only fetched and captioned once. Nothing here is per user.
 
-Frames are kept as JPEG bytes (~20 KB each) until the caption is written.
+A Reel is described in two stages (main.py drives them):
+  poster  the cover image alone, captioned right away (~0.8 s: one small JPEG,
+          one VLM call). The extension acts on this if it's conclusive.
+  frames  poster + frames from the video, captioned once ffmpeg has them (~1.7 s).
+`caption` is always the best description so far; `stage` says which one it is,
+and `caption_status` stays "pending" while a better one may still come.
+
+Frames are kept as JPEG bytes (~20 KB each) until the final caption is written.
 
 In-memory for now; move to Redis/Supabase if the service runs on more than one box.
 """
@@ -22,23 +29,60 @@ from typing import Literal
 from PIL import Image
 
 CaptionStatus = Literal["none", "pending", "ready", "failed"]
+CaptionStage = Literal["poster", "frames"]
 
 
 @dataclass
 class Media:
     key: str
-    jpegs: list[bytes]
-    timestamps: list[float]
-    frames_ms: float
-    input_desc: str
+    # The cover image, if the Reel had one we could fetch.
+    poster_jpeg: bytes | None = None
+    # Video frames (without the poster), filled in by the frames stage.
+    jpegs: list[bytes] = field(default_factory=list)
+    timestamps: list[float] = field(default_factory=list)
+    frames_ms: float = 0.0
+    input_desc: str = "pending"
+    # Best description so far and which stage wrote it.
     caption: str | None = None
-    caption_status: CaptionStatus = "none"
-    # The one in-flight caption for this Reel; /describe callers wait on it together.
-    caption_task: asyncio.Task | None = None
+    stage: CaptionStage | None = None
+    # Per-stage status. "none" = not started, "pending" = running.
+    poster_status: CaptionStatus = "none"
+    frames_status: CaptionStatus = "none"
+    # In-flight work; /describe callers wait on these together.
+    poster_task: asyncio.Task | None = None
+    frames_task: asyncio.Task | None = None
+    # Fires on every status change so waiters can re-check.
+    changed: asyncio.Event = field(default_factory=asyncio.Event)
     created_at: float = field(default_factory=time.time)
 
-    def images(self) -> list[Image.Image]:
+    @property
+    def caption_status(self) -> CaptionStatus:
+        """
+        "pending" while any stage is still running (a better `caption` may follow, even
+        if one is already set); "ready" once nothing more is coming and there is one;
+        "failed" when nothing more is coming and there isn't.
+        """
+        if "pending" in (self.poster_status, self.frames_status):
+            return "pending"
+        if self.caption is not None:
+            return "ready"
+        if "failed" in (self.poster_status, self.frames_status):
+            return "failed"
+        return "none"
+
+    def notify(self) -> None:
+        self.changed.set()
+        self.changed.clear()
+
+    def poster_image(self) -> Image.Image | None:
+        return Image.open(BytesIO(self.poster_jpeg)).convert("RGB") if self.poster_jpeg else None
+
+    def frame_images(self) -> list[Image.Image]:
         return [Image.open(BytesIO(b)).convert("RGB") for b in self.jpegs]
+
+    def all_images(self) -> list[Image.Image]:
+        poster = self.poster_image()
+        return ([poster] if poster else []) + self.frame_images()
 
 
 def to_jpegs(images: list[Image.Image]) -> list[bytes]:

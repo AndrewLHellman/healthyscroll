@@ -9,21 +9,27 @@ Reel's own text, and Jev decides.
 
 ```
                                           ┌── once per Reel, shared by ALL users (cached) ──┐
-extension ─POST /describe─▶ vision ──────▶│ first ~300 KB of the video -> 3 frames + poster  │ ~1-2 s    
- (for upcoming Reels,                     │ VLM: <= 40 words — people, activities, objects, │ ~1-2 s gateway
-  in parallel with Jev text)              │      setting, quoted on-screen text              │ ~4 s laptop GPU
+extension ─POST /describe─▶ vision ──────▶│ stage "poster": cover image -> VLM description   │ ~0.8 s
+ (for upcoming Reels,                     │ stage "frames": first ~300 KB of the video ->    │ ~1.7 s
+  in parallel with Jev text)              │   3 frames + poster -> VLM description           │ (~4 s laptop GPU)
+                                          │ VLM: <= 60 words — people, activities, objects,  │
+                                          │      setting, quoted on-screen text              │
                                           └──────────────────────────────────────────────────┘
                                           │
-             description ◀────────────────┘   (or "pending" → poll GET /media/instagram/:id)
-                  │
+       first description ◀────────────────┘   captionStatus "pending" = a better one is coming:
+                  │                            poll GET /media/instagram/:id
                   ▼
-   extension → Jev (/api/evaluate) with text + description → skip / allow
+   extension → Jev (/api/evaluate) with text + description → skip, or wait for the next description
 ```
 
 - **Auth:** `Authorization: Bearer <Supabase access token>`, same as `/api/evaluate`.
   **Rate limit:** `VISION_RATE_PER_MIN` per user (prefetch multiplies calls).
-- **Never skip on error:** no frames / bad manifest → `422`; the extension lets Jev go on the
-  Reel's text alone.
+- **Two stages, each just a description:** Jev is never told which one it is looking at. The
+  extension skips as soon as any description makes Jev say skip and stops polling; otherwise
+  it waits for the frames stage and asks again. Most Reels are settled on the poster.
+- **Never skip on error:** no frames / bad manifest → the frames stage fails; the poster
+  stage still answers if there was a poster, else `captionStatus: "failed"` and the extension
+  lets Jev go on the Reel's text alone.
 - **Cache:** frames and descriptions are per Reel, so a popular Reel is fetched and described
   once; every extra user costs one Jev call. In memory for now (one box).
 - **Captioner** is `VISION_CAPTIONER`: `qwen3-vl-2b` on a GPU, `gemini-2.5-flash-lite` through the

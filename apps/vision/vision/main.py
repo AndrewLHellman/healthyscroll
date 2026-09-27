@@ -10,13 +10,16 @@ by every user; the extension hands that text to Jev (/api/evaluate,
 `frames[].caption`) together with the Reel's own caption, and Jev decides
 against the user's policy. Nothing about any user's policy is sent here.
 
-Flow (see apps/vision/README.md):
-  1. Per Reel, once: fetch the first few hundred KB of the video (one range
-     request) + poster; ~1 frame / 3 s (max 3) from it as small JPEGs.  (~1-2 s)
-  2. Per Reel, once: a VLM (Gemini via the AI Gateway, or Qwen3-VL on a GPU)
-     writes <= 40 words: people, activities, objects, setting, on-screen text.
-  3. /describe waits up to CAPTION_WAIT_S for that; if it's slower, the client
-     polls /media/... .
+Flow (see apps/vision/README.md), per Reel, once, in two stages that run together:
+  poster  fetch the cover image (one small JPEG, ~50 ms) and have the VLM
+          (Gemini via the AI Gateway, or Qwen3-VL on a GPU) describe it.  (~0.8 s)
+  frames  fetch the first few hundred KB of the video (one range request),
+          ~1 frame / 3 s (max 3) from it with ffmpeg, describe poster + frames.
+          This one is final.                                             (~1.7 s)
+/describe waits up to CAPTION_WAIT_S for the *first* description; the client
+polls /media/... for the final one only if it still needs it (Jev was unsure).
+Most Reels are settled on the poster alone and the frames stage is just filling
+the shared cache.
 
 The extension calls this for *upcoming* Reels as soon as they appear, so the
 description is usually ready before the viewer swipes to them.
@@ -39,8 +42,8 @@ from pydantic import BaseModel, Field, model_validator
 
 from .auth import verify_bearer
 from .config import settings
-from .frames import VideoSource, extract_frames
-from .media import CaptionStatus, Media, MediaStore, to_jpegs
+from .frames import VideoSource, extract_frames, fetch_poster
+from .media import CaptionStage, CaptionStatus, Media, MediaStore, to_jpegs
 from .scorers import REGISTRY, build_scorer
 
 log = logging.getLogger("vision")
@@ -51,8 +54,8 @@ store = MediaStore()
 
 # Generation cost grows with visual tokens; 4 spread-out frames tell the story.
 CAPTION_MAX_FRAMES = 4
-# How long /describe holds the request for the description before handing the
-# client off to polling. Gateway captions take ~1-2 s, a laptop GPU 3-7 s.
+# How long /describe holds the request for the first description before handing
+# the client off to polling. A gateway poster caption takes ~0.8 s, a laptop GPU 3-7 s.
 CAPTION_WAIT_S = 8.0
 
 
@@ -107,14 +110,18 @@ class DescribeRequest(BaseModel):
 
 class DescribeResponse(BaseModel):
     videoId: str
+    # Images the best description so far was written from (poster counts as one).
     frames: int
-    # True when this Reel's frames came from the shared cache (another user saw it first).
+    # True when this Reel came from the shared cache (another user saw it first).
     mediaCached: bool
     framesMs: float
     totalMs: float
-    # "ready" -> `caption` is set. "pending" -> poll GET /media/... . "failed" -> give up.
+    # "pending" -> a better `caption` may follow (it can already be set): poll GET /media/... .
+    # "ready" -> `caption` is set and nothing more is coming. "failed" -> give up.
     captionStatus: CaptionStatus
     caption: str | None = None
+    # Which stage wrote `caption`: the cover image alone, or poster + video frames.
+    stage: CaptionStage | None = None
     model: str
 
 
@@ -123,6 +130,7 @@ class MediaResponse(BaseModel):
     frames: int
     captionStatus: CaptionStatus
     caption: str | None = None
+    stage: CaptionStage | None = None
 
 
 # --- helpers -----------------------------------------------------------------
@@ -154,17 +162,13 @@ def _media_key(platform: str, video_id: str) -> str:
 
 
 async def _build_media(key: str, source: VideoSource) -> Media:
-    frames = await extract_frames(source)
-    if not frames.images:
-        # The extension treats 422 as "nothing to add": Jev goes on text alone.
-        raise HTTPException(status_code=422, detail=f"no frames extracted ({frames.input_desc})")
-    return Media(
-        key=key,
-        jpegs=to_jpegs(frames.images),
-        timestamps=frames.timestamps,
-        frames_ms=frames.elapsed_ms,
-        input_desc=frames.input_desc,
-    )
+    """The cheap part, done before /describe answers: just the poster. Frames come in the background."""
+    media = Media(key=key)
+    if source.poster_url:
+        poster = await fetch_poster(source.poster_url)
+        if poster is not None:
+            media.poster_jpeg = to_jpegs([poster])[0]
+    return media
 
 
 def _spread(items: list, n: int) -> list:
@@ -174,27 +178,78 @@ def _spread(items: list, n: int) -> list:
     return [items[round(i * (len(items) - 1) / (n - 1))] for i in range(n)]
 
 
-async def _caption(media: Media) -> None:
+def _set_status(media: Media, stage: CaptionStage, status: CaptionStatus) -> None:
+    setattr(media, f"{stage}_status", status)
+    media.notify()
+
+
+async def _describe(media: Media, stage: CaptionStage, images: list) -> None:
+    started = time.perf_counter()
+    async with state["caption_slots"]:
+        text = await asyncio.to_thread(state["captioner"].describe, images)
+    # Stages can finish out of order (a slow poster call); never downgrade frames -> poster.
+    if not (stage == "poster" and media.frames_status == "ready"):
+        media.caption, media.stage = text, stage
+    log.info("%s %s caption in %.0f ms: %s", media.key, stage, (time.perf_counter() - started) * 1000, text)
+
+
+async def _poster_stage(media: Media) -> None:
     try:
-        started = time.perf_counter()
-        frames = _spread(media.images(), CAPTION_MAX_FRAMES)
-        async with state["caption_slots"]:
-            media.caption = await asyncio.to_thread(state["captioner"].describe, frames)
-        media.caption_status = "ready"
-        log.info("%s caption in %.0f ms: %s", media.key, (time.perf_counter() - started) * 1000, media.caption)
+        await _describe(media, "poster", [media.poster_image()])
+        _set_status(media, "poster", "ready")
     except Exception:
-        log.exception("%s caption failed", media.key)
-        media.caption_status = "failed"
-        # Let the next /describe for this Reel try again (the gateway may have been down).
-        media.caption_task = None
+        log.exception("%s poster caption failed", media.key)
+        _set_status(media, "poster", "failed")
+        media.poster_task = None  # let the next /describe for this Reel retry
 
 
-def _ensure_caption(media: Media) -> asyncio.Task | None:
-    """Start the Reel's caption once; concurrent callers share the same task."""
-    if media.caption_status in ("none", "failed") and media.caption_task is None:
-        media.caption_status = "pending"
-        media.caption_task = asyncio.create_task(_caption(media))
-    return media.caption_task
+async def _frames_stage(media: Media, source: VideoSource) -> None:
+    try:
+        # The poster was fetched in _build_media; pull only video frames here.
+        frames = await extract_frames(VideoSource(manifest=source.manifest, url=source.url, path=source.path))
+        media.jpegs = to_jpegs(frames.images)
+        media.timestamps = frames.timestamps
+        media.frames_ms = frames.elapsed_ms
+        media.input_desc = frames.input_desc
+        log.info("%s frames=%d (%s, %.0fms)", media.key, len(frames.images), frames.input_desc, frames.elapsed_ms)
+        if not frames.images:
+            raise RuntimeError(f"no frames extracted ({frames.input_desc})")
+        await _describe(media, "frames", _spread(media.all_images(), CAPTION_MAX_FRAMES))
+        _set_status(media, "frames", "ready")
+    except Exception:
+        log.exception("%s frames caption failed", media.key)
+        _set_status(media, "frames", "failed")
+        media.frames_task = None
+
+
+def _ensure_stages(media: Media, source: VideoSource) -> None:
+    """Start whatever hasn't run (or failed last time); concurrent callers share the tasks."""
+    if media.poster_jpeg and media.poster_status in ("none", "failed") and media.poster_task is None:
+        media.poster_status = "pending"
+        media.poster_task = asyncio.create_task(_poster_stage(media))
+    if media.frames_status in ("none", "failed") and media.frames_task is None:
+        media.frames_status = "pending"
+        media.frames_task = asyncio.create_task(_frames_stage(media, source))
+
+
+async def _wait_for_first_caption(media: Media, timeout: float) -> None:
+    """Return once any stage has written a description, nothing is running any more, or time is up."""
+    deadline = time.perf_counter() + timeout
+    while media.caption is None and media.caption_status == "pending":
+        remaining = deadline - time.perf_counter()
+        if remaining <= 0:
+            return
+        try:
+            await asyncio.wait_for(media.changed.wait(), timeout=remaining)
+        except asyncio.TimeoutError:
+            return
+
+
+def _image_count(media: Media) -> int:
+    """How many images the current `caption` was written from."""
+    if media.stage == "frames":
+        return min((1 if media.poster_jpeg else 0) + len(media.jpegs), CAPTION_MAX_FRAMES)
+    return 1 if media.stage == "poster" else 0
 
 
 # --- routes ------------------------------------------------------------------
@@ -217,30 +272,26 @@ async def describe(req: DescribeRequest, request: Request, authorization: str | 
 
     key = _media_key(req.platform, req.videoId)
     source = VideoSource(manifest=req.manifest, url=req.videoUrl, poster_url=req.posterUrl)
-    try:
-        media, cached = await store.get_or_build(key, lambda: _build_media(key, source))
-    except ValueError as err:  # malformed manifest
-        raise HTTPException(status_code=422, detail=str(err)) from err
-
-    task = _ensure_caption(media)
-    if task is not None and media.caption_status == "pending":
-        remaining = CAPTION_WAIT_S - (time.perf_counter() - started)
-        if remaining > 0:
-            await asyncio.wait({task}, timeout=remaining)
+    media, cached = await store.get_or_build(key, lambda: _build_media(key, source))
+    # A malformed manifest or unreachable video surfaces as the frames stage failing;
+    # the poster stage still answers if there was a poster.
+    _ensure_stages(media, source)
+    await _wait_for_first_caption(media, CAPTION_WAIT_S - (time.perf_counter() - started))
 
     res = DescribeResponse(
         videoId=req.videoId,
-        frames=len(media.jpegs),
+        frames=_image_count(media),
         mediaCached=cached,
         framesMs=0.0 if cached else round(media.frames_ms, 1),
         totalMs=round((time.perf_counter() - started) * 1000, 1),
         captionStatus=media.caption_status,
         caption=media.caption,
+        stage=media.stage,
         model=settings.captioner,
     )
     log.info(
-        "%s %s cached=%s frames=%d (%s, %.0fms) total=%.0fms",
-        key, media.caption_status, cached, len(media.jpegs), media.input_desc, media.frames_ms, res.totalMs,
+        "%s %s stage=%s cached=%s total=%.0fms",
+        key, media.caption_status, media.stage, cached, res.totalMs,
     )
     return res
 
@@ -254,7 +305,8 @@ async def media_status(platform: str, video_id: str, request: Request, authoriza
         raise HTTPException(status_code=404, detail="unknown reel; POST /describe first")
     return MediaResponse(
         videoId=video_id,
-        frames=len(media.jpegs),
+        frames=_image_count(media),
         captionStatus=media.caption_status,
         caption=media.caption,
+        stage=media.stage,
     )

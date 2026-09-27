@@ -29,7 +29,7 @@ def show(label: str, res: httpx.Response) -> dict:
         return data
     print(
         f"{label:<30} {res.status_code} frames={data['frames']} mediaCached={data['mediaCached']!s:<5} "
-        f"framesMs={data['framesMs']:.0f} totalMs={data['totalMs']:.0f} [{data['captionStatus']}] {data.get('caption')!r}"
+        f"framesMs={data['framesMs']:.0f} totalMs={data['totalMs']:.0f} [{data['captionStatus']} {data.get('stage')}] {data.get('caption')!r}"
     )
     return data
 
@@ -61,8 +61,8 @@ def main() -> None:
                 time.sleep(0.2)
             print(f"{'  caption after':<30} {(time.perf_counter() - t0) * 1000:.0f} ms [{m['captionStatus']}] {m['caption']!r}")
 
-        show("bad manifest -> 422", c.post("/describe", json={"videoId": "bad", "manifest": "<MPD"}))
-        show("missing video -> 422", c.post("/describe", json={"videoId": "gone", "videoUrl": f"{FILES}/nope.mp4"}))
+        show("bad manifest -> failed", c.post("/describe", json={"videoId": "bad", "manifest": "<MPD"}))
+        show("missing video -> failed", c.post("/describe", json={"videoId": "gone", "videoUrl": f"{FILES}/nope.mp4"}))
         show("no source -> 422", c.post("/describe", json={"videoId": "none"}))
         print(f"{'unknown reel poll':<30} {c.get('/media/instagram/never-seen').status_code}")
 

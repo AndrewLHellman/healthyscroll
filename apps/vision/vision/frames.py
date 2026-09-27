@@ -246,6 +246,15 @@ def _fetch_poster(url: str, long_side: int) -> Image.Image | None:
     return img
 
 
+async def fetch_poster(url: str, long_side: int | None = None) -> Image.Image | None:
+    """The Reel's cover image, resized like a frame. None if it can't be fetched.
+
+    main.py fetches this on its own, ahead of the video: one small JPEG is enough
+    for a first description while ffmpeg is still working on the frames.
+    """
+    return await asyncio.to_thread(_fetch_poster, url, long_side or settings.frame_long_side)
+
+
 async def extract_frames(
     source: VideoSource,
     timestamps: list[float] | None = None,

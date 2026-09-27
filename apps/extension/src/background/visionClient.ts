@@ -1,4 +1,5 @@
 import type {
+  VisionCaptionStage,
   VisionDescribeRequest,
   VisionDescribeResponse,
   VisionMediaResponse,
@@ -21,42 +22,61 @@ export async function describe(req: VisionDescribeRequest): Promise<VisionDescri
   return (await res.json()) as VisionDescribeResponse;
 }
 
-/**
- * The Reel's description: what /describe returned if it was ready, otherwise
- * poll for it. Resolves to the text, or null on failure/timeout — never throws.
- */
-export async function describeAndWait(
-  req: VisionDescribeRequest,
-  { timeoutMs = 20_000, intervalMs = 1000 } = {},
-): Promise<string | null> {
-  const started = performance.now();
-  const first = await describe(req);
-  // Server-side split: framesMs is ffmpeg, the rest of totalMs is waiting on the VLM.
-  console.log(
-    `[vision] ${req.videoId} /describe ${first.captionStatus} frames=${first.frames} cached=${first.mediaCached} ` +
-      `server framesMs=${first.framesMs} totalMs=${first.totalMs} (${first.model}) round trip ${Math.round(performance.now() - started)}ms`,
-  );
-  if (first.captionStatus === "ready") return first.caption ?? null;
-  if (first.captionStatus !== "pending") return null;
+export interface Description {
+  text: string;
+  /** Which stage wrote it; for logs only. Jev is never told. */
+  stage: VisionCaptionStage | null;
+}
 
+/**
+ * The Reel's descriptions as the service produces them: usually the cover image
+ * alone first (~1 s), then poster + video frames (~2 s). Yields each new one and
+ * ends when the service says nothing more is coming, on error, or at timeoutMs.
+ * Never throws. Stop consuming (break/return) to stop polling.
+ */
+export async function* describeStream(
+  req: VisionDescribeRequest,
+  { timeoutMs = 20_000, intervalMs = 700 } = {},
+): AsyncGenerator<Description> {
+  const started = performance.now();
+  const elapsed = () => `${Math.round(performance.now() - started)}ms`;
+  let first: VisionDescribeResponse;
+  try {
+    first = await describe(req);
+  } catch (err) {
+    console.warn(`[vision] ${req.videoId} /describe failed after ${elapsed()}`, err);
+    return;
+  }
+  console.log(
+    `[vision] ${req.videoId} /describe ${first.captionStatus} stage=${first.stage ?? "-"} cached=${first.mediaCached} ` +
+      `server totalMs=${first.totalMs} (${first.model}) round trip ${elapsed()}`,
+  );
+  let last: VisionDescribeResponse | VisionMediaResponse = first;
+
+  let yieldedStage: VisionCaptionStage | null | undefined;
   const deadline = Date.now() + timeoutMs;
   let polls = 0;
-  while (Date.now() < deadline) {
+  for (;;) {
+    if (last.caption && last.stage !== yieldedStage) {
+      yieldedStage = last.stage ?? null;
+      yield { text: last.caption, stage: yieldedStage };
+    }
+    if (last.captionStatus !== "pending") {
+      if (polls) console.log(`[vision] ${req.videoId} ${last.captionStatus} after ${polls} poll(s), ${elapsed()}`);
+      return;
+    }
+    if (Date.now() >= deadline) {
+      console.warn(`[vision] ${req.videoId} still pending after ${polls} poll(s); giving up at ${elapsed()}`);
+      return;
+    }
     await new Promise((r) => setTimeout(r, intervalMs));
     try {
       polls++;
       const res = await authedFetch(`${VISION_BASE_URL}/media/${req.platform}/${encodeURIComponent(req.videoId)}`);
-      if (!res.ok) return null;
-      const media = (await res.json()) as VisionMediaResponse;
-      if (media.captionStatus !== "pending") {
-        console.log(`[vision] ${req.videoId} ${media.captionStatus} after ${polls} poll(s), ${Math.round(performance.now() - started)}ms`);
-      }
-      if (media.captionStatus === "ready") return media.caption ?? null;
-      if (media.captionStatus !== "pending") return null;
+      if (!res.ok) return;
+      last = (await res.json()) as VisionMediaResponse;
     } catch {
-      return null;
+      return;
     }
   }
-  console.warn(`[vision] ${req.videoId} still pending after ${polls} poll(s); giving up at ${Math.round(performance.now() - started)}ms`);
-  return null;
 }
