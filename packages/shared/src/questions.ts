@@ -32,13 +32,20 @@ export const jevQuestions = {
     // Worded as "is it about / does it feature a topic in the policy", not "does it
     // conflict with the policy": on real Reels with policy "animals" (2026-09-26) this
     // moved cat/turtle/dog videos from ~0.72 to 0.99 while non-matches stayed <= 0.06.
+    // "Features" is spelled out as presence: with policy "women", a travel Reel whose
+    // description read "a young woman ... in front of Mount Rainier" was allowed
+    // (2026-09-27) because Jev judged what the video was *about* (travel).
     instructions:
       "`policy` lists topics the viewer does not want to see. Is this short video about, or does it " +
       "feature, any of those topics? Judge from the video's description, hashtags, author, audio title, " +
-      "comments and visual captions. If the policy is empty or says none was written, the answer is false.",
+      "comments and visual captions. A topic is featured when a person, thing or subject named in the " +
+      "policy is visibly present in the video, even if the video is mainly about something else. " +
+      "If the policy is empty or says none was written, the answer is false.",
     criteria: {
-      true: "The video is about or clearly features at least one topic listed in the policy.",
-      false: "The video is not about and does not feature any topic listed in the policy, or there is no policy.",
+      true:
+        "The video is about at least one topic listed in the policy, or clearly shows one: something the " +
+        "policy names is present in the video, whatever the video is mainly about.",
+      false: "The video is not about and does not show any topic listed in the policy, or there is no policy.",
     },
   },
   category: {
