@@ -11,12 +11,12 @@ export function Prompt() {
           <div className="mt-auto">
             <p className="text-[13px] font-medium uppercase tracking-wider text-faint">Setup</p>
             <h2 className="mt-3 font-display text-[56px] font-semibold leading-[1.02] tracking-[-0.03em]">
-              One text box.
+              Decide what belongs
               <br />
-              That’s the setup.
+              in your feed.
             </h2>
             <p className="mt-5 max-w-[520px] text-[19px] leading-relaxed text-muted">
-              There are no categories or sliders. Write a list, or just say, “stuff that makes me feel worse about myself.”
+              Describe what you’d like to see less of. You can change your prompt whenever you want.
             </p>
           </div>
           <div className="mt-8">

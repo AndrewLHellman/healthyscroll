@@ -25,7 +25,7 @@ export function Week() {
           <div>
             <p className="text-[13px] font-medium uppercase tracking-wider text-faint">Your week</p>
             <h2 className="mt-3 max-w-[820px] font-display text-[44px] font-semibold leading-[1.05] tracking-[-0.03em]">
-              See where your time went, and what kept you there.
+              Get to know your scrolling habits.
             </h2>
           </div>
           <BigWordmark height={32} />
@@ -76,7 +76,7 @@ export function Week() {
 
           <section className="flex flex-col bg-paper px-7 py-6">
             <div className="flex items-baseline justify-between">
-              <h3 className="text-[12px] font-medium uppercase tracking-wider text-faint">What holds you</h3>
+              <h3 className="text-[12px] font-medium uppercase tracking-wider text-faint">What you watch longest</h3>
               <p className="font-mono text-[12px] text-faint">1× = your average, {formatDuration(week.totalMs / week.watched)}</p>
             </div>
             <ol className="mt-5 flex flex-col gap-3.5">
@@ -99,18 +99,18 @@ export function Week() {
               })}
             </ol>
             <p className="mt-auto border-t border-line pt-4 text-[17px] leading-relaxed text-muted">
-              <span className="text-ink">{cap(CATEGORY_LABELS[topHold.category])}</span> made up{" "}
-              <span className="text-ink">{pct(topHold.count / week.watched)}</span> of the Reels you saw and{" "}
+              <span className="text-ink">{cap(CATEGORY_LABELS[topHold.category])}</span> is{" "}
+              <span className="text-ink">{pct(topHold.count / week.watched)}</span> of what you scrolled past and{" "}
               <span className="text-skip">{pct(topTotal.share)}</span> of your time.
             </p>
             <div className="mt-4 flex items-baseline gap-6 border-t border-line pt-4">
-              <p className="font-display text-[26px] font-semibold tracking-tight">
+              <p className="whitespace-nowrap font-display text-[26px] font-semibold tracking-tight">
                 {week.skipped.count} <span className="font-sans text-[13px] font-normal text-muted">skipped</span>
               </p>
-              <p className="font-display text-[26px] font-semibold tracking-tight">
-                ~{formatDuration(week.skipped.savedMs)} <span className="font-sans text-[13px] font-normal text-muted">not spent</span>
+              <p className="whitespace-nowrap font-display text-[26px] font-semibold tracking-tight">
+                ~{formatDuration(week.skipped.savedMs)} <span className="font-sans text-[13px] font-normal text-muted">estimated time saved</span>
               </p>
-              <p className="ml-auto font-mono text-[12px] text-faint">stays on this phone</p>
+              <p className="ml-auto max-w-[150px] text-right font-mono text-[12px] leading-snug text-faint">only daily totals by topic are synced</p>
             </div>
           </section>
         </figure>

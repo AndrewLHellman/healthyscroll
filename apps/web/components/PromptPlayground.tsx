@@ -1,17 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toVerdict, type Verdict } from "@healthyscroll/shared";
 import { Footage } from "./Footage";
 import { CLIPS } from "@/lib/playground/clips";
-import { getScorer } from "@/lib/playground/scorers";
+import { jevScorer, keywordScorer, type Scorer } from "@/lib/playground/scorers";
 
 /**
  * The prompt is one text box, so this section is one text box. Type (or pick)
- * a prompt and a strip of mock clips re-scores. Scoring goes through a
- * `Scorer` (lib/playground/scorers.ts): a keyword lookup by default, real Jev
- * when `NEXT_PUBLIC_PLAYGROUND_SCORER=jev`. Verdicts come from the same
- * thresholds the extension uses.
+ * a prompt and a strip of mock Reels re-scores. Scoring goes through a
+ * `Scorer` (lib/playground/scorers.ts): real Jev via `/api/playground`, with a
+ * keyword lookup as the fallback if that route is unavailable. Verdicts come
+ * from the same thresholds the extension uses.
  */
 
 const PRESETS = [
@@ -25,13 +25,17 @@ const PRESETS = [
 type Score = number | null;
 
 export function PromptPlayground() {
-  const scorer = useMemo(getScorer, []);
+  // Starts live; drops to the keyword mock for the rest of the visit if the
+  // route fails (no gateway key locally, gateway down, rate limited).
+  const [scorer, setScorer] = useState<Scorer>(jevScorer);
   const [prompt, setPrompt] = useState(PRESETS[0]);
-  const [scores, setScores] = useState<Score[]>(() => CLIPS.map((c) => c.mock.miss));
-  const [pending, setPending] = useState(false);
+  const [scores, setScores] = useState<Score[]>(() => CLIPS.map(() => null));
+  const [pending, setPending] = useState(true);
   const live = scorer.id === "jev";
   // Bumped per request so a slow response can't overwrite a newer one.
   const seq = useRef(0);
+  // The default prompt is scored as soon as the page loads; only edits wait.
+  const mounted = useRef(false);
 
   useEffect(() => {
     const trimmed = prompt.trim();
@@ -42,17 +46,21 @@ export function PromptPlayground() {
     }
     const id = ++seq.current;
     const ctrl = new AbortController();
+    const delay = mounted.current ? scorer.debounceMs : 0;
+    mounted.current = true;
     const t = window.setTimeout(async () => {
       if (live) setPending(true);
       try {
         const next = await scorer.score(trimmed, CLIPS, ctrl.signal);
         if (id === seq.current) setScores(next);
       } catch {
-        // Aborted by a newer keystroke; nothing to show.
+        // Aborted by a newer keystroke: nothing to show. Anything else means
+        // the live route is out; the mock takes over and the effect re-runs.
+        if (!ctrl.signal.aborted && live) setScorer(keywordScorer);
       } finally {
         if (id === seq.current) setPending(false);
       }
-    }, scorer.debounceMs);
+    }, delay);
     return () => {
       window.clearTimeout(t);
       ctrl.abort();
@@ -65,7 +73,7 @@ export function PromptPlayground() {
   const status = !prompt.trim()
     ? "type something to score the feed"
     : pending
-      ? `asking jev about ${CLIPS.length} clips…`
+      ? `asking jev about ${CLIPS.length} reels…`
       : skipped === 0
         ? "nothing in this feed matches · try adding a word"
         : `${skipped} of ${CLIPS.length} skipped · edit a word and watch it change`;
@@ -108,7 +116,7 @@ export function PromptPlayground() {
                 live · scored by jev
               </>
             ) : (
-              "demo · keyword match, not jev"
+              "offline demo · keyword match, not jev"
             )}
           </span>
         </p>

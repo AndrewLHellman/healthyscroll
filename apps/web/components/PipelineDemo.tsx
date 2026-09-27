@@ -62,7 +62,7 @@ const CLIPS: Clip[] = [
 
 interface Line {
   stage: "text" | "visual";
-  model: "jev" | "moondream";
+  model: "jev" | "gemini";
   body: string;
   p?: number;
   ms?: number;
@@ -111,12 +111,12 @@ function buildFrames(): Frame[] {
     }
 
     if (c.visual) {
-      const mdPending: Line = { stage: "visual", model: "moondream", body: "describing one frame…", pending: true };
-      const mdDone: Line = { stage: "visual", model: "moondream", body: `“${c.visual.caption}”` };
+      const mdPending: Line = { stage: "visual", model: "gemini", body: "describing the Reel’s images…", pending: true };
+      const mdDone: Line = { stage: "visual", model: "gemini", body: `“${c.visual.caption}”` };
       const jevDone: Line = {
         stage: "visual",
         model: "jev",
-        body: "with the frame described, does it match?",
+        body: "with the video described, does it match?",
         p: c.visual.p,
         ms: c.visual.ms,
         verdict: verdictOf(c.visual.p),
@@ -167,7 +167,7 @@ export function PipelineDemo() {
     <div
       className="rounded-2xl border border-line bg-mist p-3 sm:p-4"
       role="img"
-      aria-label="Animated demo: a Reel appears; Healthy Scroll reads its caption, asks Jev for a probability, optionally has Moondream describe one frame, and skips the Reel if it matches the user's policy."
+      aria-label="Illustrative demo: Healthy Scroll checks upcoming Reels with Jev while Gemini describes their images. Jev uses the text and descriptions to decide what matches your prompt."
     >
       <div className="grid gap-3 sm:gap-4 lg:grid-cols-[minmax(0,260px)_1fr]">
         <FeedCard clip={clip} card={frame.card} skipped={frame.skipped || i === null} clipIndex={frame.clip} />
@@ -261,7 +261,7 @@ function Trace({ lines, clip }: { lines: Line[]; clip: Clip }) {
       </ol>
 
       <div className="mt-auto flex items-center justify-between gap-3 border-t border-line pt-3 text-[11px] text-faint">
-        <span>frames described, then discarded</span>
+        <span>Reel images analyzed on the server</span>
         <span className="flex items-center gap-3">
           <Key color="bg-keep" label="keep" />
           <Key color="bg-faint" label="look closer" />

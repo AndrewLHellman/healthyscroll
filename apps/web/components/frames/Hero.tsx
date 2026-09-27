@@ -15,17 +15,17 @@ export function Hero() {
         </div>
         <div className="mt-auto max-w-[660px]">
           <h1 className="font-display text-[60px] font-semibold leading-[1.02] tracking-[-0.03em]">
-            Skip the Reels you never wanted to see.
+            Take back your feed.
             <br />
-            <span className="text-muted">Before they hook you.</span>
+            <span className="text-muted">Make room for what you want to watch.</span>
           </h1>
           <p className="mt-6 max-w-[560px] text-[21px] leading-relaxed text-muted">
-            A Safari extension for iPhone. You write the rule in plain English. It does the scrolling.
+            A Safari extension for iPhone. Decide what belongs in your feed, and skip matching Reels.
           </p>
         </div>
         <p className="mt-8 font-mono text-[14px] text-faint">
           healthyscroll.net <span className="mx-2">·</span> free <span className="mx-2">·</span> open source{" "}
-          <span className="mx-2">·</span> frames are described, then discarded
+          <span className="mx-2">·</span> sign in with Google
         </p>
       </div>
 
@@ -45,10 +45,10 @@ export function Hero() {
         </div>
         <div className="absolute -left-[150px] top-[150px] w-[300px] rounded-xl border border-line bg-paper p-4 shadow-[0_24px_60px_-28px_rgba(18,20,26,0.35)]">
           <p className="flex items-center gap-2 text-[13px] text-muted">
-            <span className="h-2 w-2 rounded-full bg-skip" /> Skipped before it played
+            <span className="h-2 w-2 rounded-full bg-skip" /> Skipped because it matched
           </p>
           <p className="mt-2 text-[15px] leading-snug">
-            It matched your rule: <span className="font-medium">“gambling”</span>
+            It matched your prompt: <span className="font-medium">“gambling”</span>
           </p>
         </div>
       </div>

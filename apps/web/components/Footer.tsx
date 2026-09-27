@@ -35,7 +35,7 @@ const COLUMNS = [
         label: 'Jev by TypeSafe AI',
         href: 'https://typesafe.ai/',
       },
-      { label: 'Moondream', href: 'https://moondream.ai' },
+      { label: 'Gemini', href: 'https://deepmind.google/models/gemini/' },
       { label: 'Vercel AI Gateway', href: 'https://vercel.com/ai-gateway' },
     ],
   },
@@ -59,7 +59,11 @@ export function Footer() {
           <Wordmark />
           <p className='max-w-xs text-sm leading-relaxed text-muted'>
             Built with{' '}
-            <PixelHeart size={16} className='inline-block align-[-2px]' /> by{' '}
+            <PixelHeart
+              size={16}
+              className='inline-block align-[-2px] mx-[1px]'
+            />{' '}
+            by{' '}
             {TEAM.map((m, i) => (
               <span key={m.name}>
                 <a
@@ -70,10 +74,14 @@ export function Footer() {
                 >
                   {m.name}
                 </a>
-                {i < TEAM.length - 2 ? ', ' : i === TEAM.length - 2 ? ', and ' : ''}
+                {i < TEAM.length - 2
+                  ? ', '
+                  : i === TEAM.length - 2
+                    ? ', and '
+                    : ''}
               </span>
             ))}{' '}
-            for University of Missouri TigerHacks 2026.
+            at University of Missouri TigerHacks 2026.
           </p>
         </div>
         {COLUMNS.map((col) => (
@@ -101,9 +109,7 @@ export function Footer() {
       </div>
       <div className='mx-auto flex max-w-6xl flex-col gap-2 border-t border-line px-5 py-6 text-xs text-faint sm:flex-row sm:items-center sm:justify-between sm:px-8'>
         <span>© 2026 Healthy Scroll. Open source.</span>
-        <span>
-          Frames are described and discarded, never stored.
-        </span>
+        <span>Reels are analyzed without uploading your screen.</span>
       </div>
     </footer>
   )

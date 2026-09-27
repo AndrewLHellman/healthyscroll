@@ -13,7 +13,7 @@ const STEPS = [
   },
   {
     title: "Say what to skip",
-    body: "Describe the content you want to avoid and save your prompt. You can change it at any time.",
+    body: "Sign in with Google, then describe the content you want to avoid and save your prompt. You can change it at any time.",
     screen: <PromptScreen />,
   },
   {
@@ -33,7 +33,7 @@ export function GettingStarted() {
             Get started in Safari.
           </h2>
           <p className="mt-4 text-lg leading-relaxed text-muted">
-            Install the extension, save your prompt, and open Instagram in your browser.
+            Install the extension, sign in, and choose what to skip before opening Instagram in your browser.
           </p>
         </div>
 
@@ -51,8 +51,8 @@ export function GettingStarted() {
         </ol>
 
         <p className="mt-6 max-w-3xl text-sm text-muted">
-          Healthy Scroll checks captions and comments first. If it needs more context, it uses a description
-          of a video frame, then discards the image. If a check fails, the Reel keeps playing.
+          Healthy Scroll checks upcoming Reels using their text and descriptions of their images and video.
+          Jev compares that information with your prompt. A failed check won’t trigger a skip.
         </p>
       </div>
     </section>

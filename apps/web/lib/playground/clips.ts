@@ -3,15 +3,18 @@ import type { VideoContext } from "@healthyscroll/shared";
 /**
  * The mock feed behind the prompt playground on the landing page.
  *
- * Each clip carries a full `VideoContext` (what the extension would scrape off
- * the page) plus the sentence Moondream would produce for its frame, so the
- * live Jev scorer gets exactly the inputs the real pipeline does. The `mock`
- * block is only read by the keyword scorer.
+ * Each clip carries the `VideoContext` the content script would scrape off a
+ * Reel (author, caption, hashtags, audio) plus the description the vision
+ * service would write for its video, so Jev gets exactly the inputs the real
+ * text+description pass does (see background/reels.ts). Scoring happens
+ * server-side in `app/api/playground/route.ts` against this fixed list, so a
+ * visitor can only ever ask about these eight Reels. The `mock` block is only
+ * read by the keyword fallback.
  */
 export interface PlaygroundClip {
   context: VideoContext;
-  /** What Moondream would say about the first frame. Sent to Jev as a frame caption. */
-  frameCaption: string;
+  /** What `/describe` would say about the video. Sent to Jev as the visual caption. */
+  visionDescription: string;
   /** Two-stop gradient standing in for the video. */
   tone: [string, string];
   mock: {
@@ -29,20 +32,20 @@ const clip = (
   description: string,
   hashtags: string[],
   audioTitle: string,
-  frameCaption: string,
+  visionDescription: string,
   tone: [string, string],
   mock: PlaygroundClip["mock"],
 ): PlaygroundClip => ({
   context: {
     videoId: `playground-${author}`,
-    platform: "tiktok",
-    url: `https://www.tiktok.com/@${author}/video/playground`,
+    platform: "instagram",
+    url: `https://www.instagram.com/reel/playground-${author}/`,
     author,
     description,
     hashtags,
     audioTitle,
   },
-  frameCaption,
+  visionDescription,
   tone,
   mock,
 });
@@ -53,7 +56,7 @@ export const CLIPS: PlaygroundClip[] = [
     "late night spins 🎰 #bigwin",
     ["slots", "bigwin", "casino"],
     "original sound",
-    "a slot machine screen with spinning reels and flashing lights",
+    "A phone screen recording of an online slot machine. Reels spin and stop on matching symbols while gold coins and a flashing 'BIG WIN' banner fill the screen; the balance in the corner jumps up.",
     ["#3b1d5a", "#0f0c1a"],
     { tags: ["gambling"], hit: 0.96, miss: 0.02 },
   ),
@@ -62,7 +65,7 @@ export const CLIPS: PlaygroundClip[] = [
     "focaccia, day 3",
     ["sourdough", "baking"],
     "Kitchen sounds",
-    "hands pressing dimples into bread dough on a wooden counter",
+    "Close-up of hands pressing dimples into oiled bread dough in a metal pan on a wooden counter. Rosemary and coarse salt are scattered on top, then the pan goes into an oven.",
     ["#e8b27a", "#7a4a22"],
     { tags: ["food"], hit: 0.88, miss: 0.01 },
   ),
@@ -71,7 +74,7 @@ export const CLIPS: PlaygroundClip[] = [
     "and that was the night 🍾",
     ["nightout", "weekend"],
     "trending audio",
-    "a crowded bar, several people holding drinks and shot glasses",
+    "Handheld footage inside a crowded, dimly lit bar. A group of friends clink shot glasses and drink, someone sprays a bottle of champagne, and the clip ends with them singing in the back of a taxi.",
     ["#1b2a44", "#0a0e17"],
     { tags: ["drinking"], hit: 0.91, miss: 0.04 },
   ),
@@ -80,7 +83,7 @@ export const CLIPS: PlaygroundClip[] = [
     "6am loop before work",
     ["trailrunning", "morning"],
     "Avril 14th — Aphex Twin",
-    "a person running on a dirt trail at sunrise, trees on both sides",
+    "A person in running gear jogs along a dirt trail at sunrise with trees on both sides. Wide shots of mist over a valley, then a watch face showing distance and pace.",
     ["#d9c7a3", "#5e6a4e"],
     { tags: [], hit: 0.5, miss: 0.03 },
   ),
@@ -89,7 +92,7 @@ export const CLIPS: PlaygroundClip[] = [
     "12 week transformation 🔥",
     ["transformation", "gym", "shredded"],
     "phonk mix",
-    "a shirtless man flexing in a gym mirror, side-by-side before and after",
+    "A shirtless man flexes in a gym mirror. A side-by-side before-and-after compares his physique, with on-screen text reading 'week 1' and 'week 12', then he poses under bright lights showing defined abs.",
     ["#2b2b2b", "#0d0d0d"],
     { tags: ["body"], hit: 0.84, miss: 0.06 },
   ),
@@ -98,7 +101,7 @@ export const CLIPS: PlaygroundClip[] = [
     "he really said that 💀 #debate",
     ["debate", "politics", "ratio"],
     "original sound",
-    "a split-screen reaction video with large red caption text",
+    "A split-screen reaction video: on one side a clip of a politician speaking at a podium, on the other a man reacting with exaggerated disbelief. Large red caption text mocks the quote and the comments count is highlighted.",
     ["#7a1f1f", "#1a0707"],
     { tags: ["rage"], hit: 0.89, miss: 0.02 },
   ),
@@ -107,7 +110,7 @@ export const CLIPS: PlaygroundClip[] = [
     "this coin does 40x by friday",
     ["crypto", "altcoins", "100x"],
     "original sound",
-    "a man talking to camera in front of a green candlestick chart",
+    "A man talks to the camera in front of a green candlestick chart. He points at a coin's ticker and price target, and on-screen text urges viewers to buy before the weekend.",
     ["#0e3b2e", "#03110c"],
     { tags: ["crypto"], hit: 0.93, miss: 0.01 },
   ),
@@ -116,7 +119,7 @@ export const CLIPS: PlaygroundClip[] = [
     "centering, finally",
     ["pottery", "wheelthrowing"],
     "lo-fi beats",
-    "hands shaping wet clay on a spinning pottery wheel",
+    "Close-up of hands shaping wet clay on a spinning pottery wheel. The lump slowly rises into a bowl, then the potter trims the rim with a wooden tool.",
     ["#b8a08a", "#4a3b30"],
     { tags: [], hit: 0.5, miss: 0.02 },
   ),
