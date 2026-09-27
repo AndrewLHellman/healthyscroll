@@ -8,11 +8,14 @@ reads the index and fetches only the bytes around each timestamp (HTTP range
 requests). The same path works for a plain progressive MP4 URL or a local file.
 
 Frames: one every VISION_FRAME_EVERY_S (default 3 s), at most VISION_MAX_FRAMES (3),
-plus the poster image as frame 0 when given. One ffmpeg process per Reel reads
-the video from the first timestamp to the last in a single connection and emits
-every Nth second as a JPEG. (One process per timestamp, each with its own TLS
-handshake + index fetch + seek to a CDN on the other side of the world, took
-5-7 s per Reel on the server, 2026-09-27; the VLM itself takes < 1 s.)
+plus the poster image as frame 0 when given. Greedy by design: one range request
+for the first few hundred KB of the smallest representation (prefix_budget),
+decoded from memory by one ffmpeg process; whatever frames fall inside that
+prefix are the frames. Fixed cost per Reel, however long it is. If the file's
+index isn't at the front (a non-faststart MP4) ffmpeg seeks over HTTP instead.
+(History, 2026-09-27: one ffmpeg per timestamp, each with its own TLS handshake
++ index fetch + seek to a CDN 155 ms away, took 5-7 s per Reel; one ffmpeg
+streaming 10 s of video took ~3.4 s; the VLM itself takes < 1 s.)
 Explicit timestamps (benchmarks) still use one seek per timestamp.
 ffmpeg runs in threads rather than asyncio subprocesses: the latter needs the
 Proactor loop on Windows, which uvicorn doesn't always use.
@@ -81,8 +84,8 @@ def sample_timestamps(duration: float | None) -> list[float]:
     return ts
 
 
-def pick_dash_video_url(manifest: str) -> tuple[str | None, float | None]:
-    """Smallest video representation's BaseURL (>= 360p when available) and the duration in seconds."""
+def pick_dash_video_url(manifest: str) -> tuple[str | None, float | None, int | None]:
+    """Smallest video representation's BaseURL (>= 360p when available), the duration in seconds, its bandwidth (bit/s)."""
     try:
         root = ET.fromstring(manifest)
     except ET.ParseError as err:
@@ -104,10 +107,10 @@ def pick_dash_video_url(manifest: str) -> tuple[str | None, float | None]:
             candidates.append((height, bandwidth, base.text.strip()))
 
     if not candidates:
-        return None, duration
+        return None, duration, None
     good = [c for c in candidates if c[0] >= 360] or candidates
     good.sort(key=lambda c: (c[1], c[0]))
-    return good[0][2], duration
+    return good[0][2], duration, good[0][1] or None
 
 
 def _parse_iso_duration(value: str | None) -> float | None:
@@ -164,11 +167,67 @@ def _grab_every(
     cmd += ["-t", f"{step * (count - 1) + 0.6:.3f}", "-frames:v", str(count)]
     cmd += ["-vf", f"{select},{_scale_filter(long_side)}", "-fps_mode", "passthrough"] + _MJPEG_OUT
     proc = subprocess.run(cmd, capture_output=True, timeout=FFMPEG_TIMEOUT_S)
-    if not proc.stdout:
-        return []  # a non-zero exit with some frames out (e.g. short video) is still useful
+    # A non-zero exit with some frames out (e.g. short video) is still useful.
+    return _split_mjpeg(proc.stdout, count)
+
+
+# One client for every CDN fetch: keep-alive skips the TLS handshake (~0.3 s at
+# the CDN's distance) for the next Reel on the same host.
+_http = httpx.Client(headers={"User-Agent": USER_AGENT}, timeout=6, follow_redirects=True)
+
+# How much of the video to pull: enough for PREFIX_S seconds at the
+# representation's bitrate (plus the index at the front), within bounds.
+PREFIX_S = 6.0
+PREFIX_MIN = 200_000
+PREFIX_MAX = 600_000
+PREFIX_UNKNOWN = 450_000  # a progressive MP4 URL: bitrate unknown, usually 720p
+
+
+def prefix_budget(bandwidth: int | None) -> int:
+    if not bandwidth:
+        return PREFIX_UNKNOWN
+    return int(min(PREFIX_MAX, max(PREFIX_MIN, bandwidth / 8 * PREFIX_S * 1.15 + 64_000)))
+
+
+def _fetch_prefix(url: str, budget: int) -> bytes:
+    """The first `budget` bytes of the file: one range request, no more."""
+    buf = bytearray()
+    try:
+        with _http.stream("GET", url, headers={"Range": f"bytes=0-{budget - 1}"}) as res:
+            if res.status_code not in (200, 206):
+                return b""
+            for chunk in res.iter_bytes():
+                buf += chunk
+                if len(buf) >= budget:
+                    break  # the server ignored Range (200): stop reading anyway
+    except httpx.HTTPError:
+        return b""
+    return bytes(buf[:budget])
+
+
+def _grab_from_bytes(data: bytes, step: float, count: int, long_side: int) -> list[Image.Image]:
+    """Up to `count` frames, `step` seconds apart, from a truncated MP4/fMP4 in memory.
+
+    ffmpeg decodes what's there and errors at the cut; the frames it emitted
+    first are still on stdout. Needs the index (moov / sidx) at the front, which
+    DASH representations and faststart MP4s have. Returns [] otherwise.
+    """
+    # First frame after the fade-in, then one every `step`.
+    select = f"select='gte(t\\,0.4)*isnan(prev_selected_t)+gte(t-prev_selected_t\\,{step:g})'"
+    cmd = [settings.ffmpeg, "-hide_banner", "-loglevel", "error", "-nostdin", "-i", "pipe:0"]
+    cmd += ["-frames:v", str(count), "-vf", f"{select},{_scale_filter(long_side)}", "-fps_mode", "passthrough"]
+    cmd += _MJPEG_OUT
+    try:
+        proc = subprocess.run(cmd, input=data, capture_output=True, timeout=FFMPEG_TIMEOUT_S)
+    except subprocess.TimeoutExpired:
+        return []
+    return _split_mjpeg(proc.stdout, count)
+
+
+def _split_mjpeg(data: bytes, count: int) -> list[Image.Image]:
     images: list[Image.Image] = []
     # An MJPEG stream is just JPEGs back to back; SOI can't occur inside a JPEG.
-    for chunk in proc.stdout.split(_JPEG_SOI)[1:]:
+    for chunk in data.split(_JPEG_SOI)[1:]:
         try:
             images.append(Image.open(BytesIO(_JPEG_SOI + chunk)).convert("RGB"))
         except OSError:
@@ -178,7 +237,7 @@ def _grab_every(
 
 def _fetch_poster(url: str, long_side: int) -> Image.Image | None:
     try:
-        res = httpx.get(url, headers={"User-Agent": USER_AGENT}, timeout=5, follow_redirects=True)
+        res = _http.get(url)
         res.raise_for_status()
         img = Image.open(BytesIO(res.content)).convert("RGB")
     except (httpx.HTTPError, OSError):
@@ -197,9 +256,10 @@ async def extract_frames(
 
     tmp_manifest: Path | None = None
     duration: float | None = None
+    bandwidth: int | None = None
     try:
         if source.manifest:
-            url, duration = pick_dash_video_url(source.manifest)
+            url, duration, bandwidth = pick_dash_video_url(source.manifest)
             if url:
                 input_, remote, desc = url, True, "dash-representation"
             else:
@@ -227,15 +287,27 @@ async def extract_frames(
         else:
             timestamps = sample_timestamps(duration)
             step = settings.frame_every_s
-            if len(timestamps) == 1:
-                results = [await asyncio.to_thread(_grab_one, input_, timestamps[0], long_side, remote)]
-            else:
-                images = await asyncio.to_thread(
-                    _grab_every, input_, timestamps[0], step, len(timestamps), long_side, remote
-                )
-                # A short video yields fewer frames; they're the leading ones.
-                timestamps = timestamps[: len(images)]
-                results = list(images)
+            images: list[Image.Image] = []
+            if remote and desc != "dash-manifest":
+                # Greedy path: the first few hundred KB in one range request,
+                # decoded from memory. Cost is fixed no matter how long the Reel is.
+                data = await asyncio.to_thread(_fetch_prefix, input_, prefix_budget(bandwidth))
+                if data:
+                    images = await asyncio.to_thread(_grab_from_bytes, data, step, len(timestamps), long_side)
+                    if images:
+                        desc += "+prefix"
+            if not images:
+                # Index not at the front, or the fetch failed: let ffmpeg seek over HTTP.
+                if len(timestamps) == 1:
+                    one = await asyncio.to_thread(_grab_one, input_, timestamps[0], long_side, remote)
+                    images = [one] if one else []
+                else:
+                    images = await asyncio.to_thread(
+                        _grab_every, input_, timestamps[0], step, len(timestamps), long_side, remote
+                    )
+            # A short video (or a small prefix) yields fewer frames; they're the leading ones.
+            timestamps = timestamps[: len(images)]
+            results = list(images)
         poster = await poster_task if poster_task else None
     finally:
         if tmp_manifest:

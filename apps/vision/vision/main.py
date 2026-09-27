@@ -11,8 +11,8 @@ by every user; the extension hands that text to Jev (/api/evaluate,
 against the user's policy. Nothing about any user's policy is sent here.
 
 Flow (see apps/vision/README.md):
-  1. Per Reel, once: fetch ~1 frame / 3 s (max 3) + poster with one ffmpeg run
-     (one connection, range requests), keep them as small JPEGs.        (~0.5-1.5 s)
+  1. Per Reel, once: fetch the first few hundred KB of the video (one range
+     request) + poster; ~1 frame / 3 s (max 3) from it as small JPEGs.  (~1-2 s)
   2. Per Reel, once: a VLM (Gemini via the AI Gateway, or Qwen3-VL on a GPU)
      writes <= 40 words: people, activities, objects, setting, on-screen text.
   3. /describe waits up to CAPTION_WAIT_S for that; if it's slower, the client
