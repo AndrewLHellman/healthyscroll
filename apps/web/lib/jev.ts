@@ -58,12 +58,16 @@ export async function decide(req: EvaluateRequest, stage: Decision["stage"]): Pr
       ? { label: cat.choice, probability: cat.probabilities?.[cat.choice] ?? 1 }
       : undefined;
 
+  const latencyMs = Date.now() - started;
+  // One line per call so `docker compose logs web` gives Jev's latency by stage.
+  console.log(`[jev] ${req.context.videoId} ${stage} p=${violatesProbability.toFixed(2)} ${latencyMs}ms`);
+
   return {
     videoId: req.context.videoId,
     verdict: hasPolicy ? toVerdict(violatesProbability) : "allow",
     violatesProbability: hasPolicy ? violatesProbability : 0,
     category,
     stage,
-    latencyMs: Date.now() - started,
+    latencyMs,
   };
 }

@@ -76,7 +76,7 @@ export function PromptPlayground() {
       ? `asking jev about ${CLIPS.length} reels…`
       : skipped === 0
         ? "nothing in this feed matches · try adding a word"
-        : `${skipped} of ${CLIPS.length} skipped · edit a word and watch it change`;
+        : `${skipped} of ${CLIPS.length} skipped · edit the prompt and watch it change`;
 
   return (
     <div className="flex flex-col gap-8">
