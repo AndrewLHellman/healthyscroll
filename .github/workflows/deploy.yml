@@ -25,7 +25,9 @@ concurrency:
 env:
   IMAGE_WEB: ghcr.io/andrewlhellman/healthyscroll-web
   IMAGE_VISION: ghcr.io/andrewlhellman/healthyscroll-vision
-  DEPLOY_HOST: 178.104.184.37
+  # Hetzner Hillsboro (US West). Moved from Falkenstein 2026-09-27: Instagram's CDN
+  # picks a US-West edge for US viewers, and vision fetches video from it per Reel.
+  DEPLOY_HOST: 5.78.142.198
   DEPLOY_USER: root
   DEPLOY_DIR: /srv/healthyscroll
 
