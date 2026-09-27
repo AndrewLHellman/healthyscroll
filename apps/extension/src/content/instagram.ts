@@ -118,17 +118,45 @@ function strategies(): SkipStrategy[] {
 }
 
 /**
+ * Resolves once the feed has stopped moving: its scroll position unchanged for
+ * `quietMs` (and at least `minMs` in, so a smooth scroll that hasn't started
+ * yet isn't mistaken for "settled"). Gives up after `maxMs`.
+ */
+async function feedSettled({ minMs = 0, quietMs = 150, maxMs = 2000 } = {}): Promise<void> {
+  const box = scrollContainerOf(mostVisibleVideo());
+  const position = () => (box ? box.scrollTop : window.scrollY);
+  const start = performance.now();
+  let last = position();
+  let stillSince = start;
+  while (performance.now() - start < maxMs) {
+    await new Promise((r) => setTimeout(r, 50));
+    const now = performance.now();
+    const at = position();
+    if (at !== last) {
+      last = at;
+      stillSince = now;
+    } else if (now - start >= minMs && now - stillSince >= quietMs) {
+      return;
+    }
+  }
+}
+
+/**
  * Move past `code`. Tries each strategy until the active Reel changes.
  * Returns the strategy that worked, or null.
+ *
+ * Every move starts and ends on a settled feed. The moves are relative (one
+ * screen down), so starting one mid-animation -- e.g. the next skip arriving
+ * while the last one is still scrolling -- would land between Reels and let
+ * scroll-snap pick the wrong one.
  */
 export async function skipReel(code: string): Promise<string | null> {
+  await feedSettled();
   for (const s of strategies()) {
     if (getActiveReelCode() !== code) return "already-moved";
     if (!s.run()) continue;
-    for (let i = 0; i < 8; i++) {
-      await new Promise((r) => setTimeout(r, 100));
-      if (getActiveReelCode() !== code) return s.name;
-    }
+    await feedSettled({ minMs: 250 });
+    if (getActiveReelCode() !== code) return s.name;
   }
   return null;
 }

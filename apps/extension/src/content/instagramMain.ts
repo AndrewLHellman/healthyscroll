@@ -169,15 +169,26 @@ chrome.runtime.onMessage.addListener((msg: BackgroundToContent) => {
     return;
   }
   if (msg.type !== "SKIP_REEL") return;
-  // Guard: only skip the Reel that's still on screen.
-  if (msg.code !== getActiveReelCode()) return;
-  log("skipping", msg.code, msg.reason);
-  // Mark it before moving: the move itself ends the view.
-  if (view?.code === msg.code) view.skipped = true;
-  void skipReel(msg.code).then((how) =>
-    log(how ? `skipped ${msg.code} via ${how}` : `skip failed: still on ${msg.code}`),
-  );
+  queueSkip(msg.code, msg.reason);
 });
+
+/**
+ * Skips run one at a time. Several matching Reels in a row means the next
+ * SKIP_REEL arrives while the previous skip is still scrolling; it waits for
+ * that to land, then checks the Reel is (still) the one on screen.
+ */
+let skipQueue: Promise<void> = Promise.resolve();
+function queueSkip(code: string, reason: string): void {
+  skipQueue = skipQueue.then(async () => {
+    // Guard: only skip the Reel that's still on screen.
+    if (code !== getActiveReelCode()) return log("not skipping", code, "(no longer on screen)");
+    log("skipping", code, reason);
+    // Mark it before moving: the move itself ends the view.
+    if (view?.code === code) view.skipped = true;
+    const how = await skipReel(code);
+    log(how ? `skipped ${code} via ${how}` : `skip failed: still on ${code}`);
+  });
+}
 
 if (DEBUG) {
   window.addEventListener("hs:probe", () => console.log("[healthyscroll] probe", probe()));
