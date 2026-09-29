@@ -219,7 +219,15 @@ export function PipelineDemo() {
     >
       <div className="grid gap-3 sm:gap-4 lg:grid-cols-[minmax(0,260px)_1fr]">
         <Feed frame={frame} still={i === null} />
-        <Trace lines={frame.lines} clip={clip} />
+        <div className="relative min-w-0">
+          {/* Reserve the full trace height before the animation starts, including on narrow screens. */}
+          <div className="invisible" aria-hidden="true">
+            <Trace lines={STATIC_FRAME.lines} clip={CLIPS[STATIC_FRAME.clip]} />
+          </div>
+          <div className="absolute inset-0">
+            <Trace lines={frame.lines} clip={clip} />
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -331,7 +339,7 @@ function Card({
 
 function Trace({ lines, clip }: { lines: Line[]; clip: Clip }) {
   return (
-    <div className="flex min-h-[300px] flex-col rounded-xl border border-line bg-paper p-4 font-mono text-[13px] leading-relaxed sm:p-5">
+    <div className="flex h-full min-h-[300px] flex-col rounded-xl border border-line bg-paper p-4 font-mono text-[13px] leading-relaxed sm:p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-line pb-3 text-xs">
         <span className="text-muted">
           skip anything that’s <span className="text-ink">{POLICY}</span>
